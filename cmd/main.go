@@ -42,12 +42,14 @@ func main() {
 	threadRepo := repository.NewThreadRepository(db)
 	postRepo := repository.NewPostRepository(db)
 	commentRepo := repository.NewCommentRepository(db)
+	chatRepo := repository.NewChatMessageRepository(db)
 	userRepo := repository.NewUserRepository(db)
 
 	// Инициализация сервисов
 	threadService := service.NewThreadService(threadRepo, postRepo)
 	postService := service.NewPostService(postRepo, commentRepo)
 	commentService := service.NewCommentService(commentRepo)
+	chatService := service.NewChatService(chatRepo)
 	userService := service.NewUserService(userRepo)
 
 	// Создание структуры сервисов для роутера
@@ -56,6 +58,7 @@ func main() {
 		PostService:    postService,
 		CommentService: commentService,
 		UserService:    userService,
+		ChatService:    chatService,
 	}
 
 	// Инициализация роутера

@@ -77,3 +77,29 @@ func (h *CommentHandler) DeleteComment(c *gin.Context) {
 
 	c.Status(http.StatusNoContent)
 }
+
+func (h *CommentHandler) CreateChatMessage(c *gin.Context) {
+	var req struct {
+		Content string `json:"content" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fmt.Printf("Ошибка при разборе JSON: %v\n", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Неверный формат данных",
+		})
+		return
+	}
+
+	// Для чата используем post_id = 0
+	comment, err := h.service.CreateComment(0, 1, req.Content) // author_id = 1 для тестирования
+	if err != nil {
+		fmt.Printf("Ошибка при создании сообщения чата: %v\n", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Ошибка при создании сообщения",
+		})
+		return
+	}
+
+	c.JSON(http.StatusCreated, comment)
+}

@@ -15,31 +15,43 @@ type ViewsHandler struct {
 	threadService  service.ThreadService
 	postService    service.PostService
 	commentService service.CommentService
+	chatService    service.ChatService
 }
 
-func NewViewsHandler(threadService service.ThreadService, postService service.PostService, commentService service.CommentService) *ViewsHandler {
+func NewViewsHandler(
+	threadService service.ThreadService,
+	postService service.PostService,
+	commentService service.CommentService,
+	chatService service.ChatService,
+) *ViewsHandler {
 	return &ViewsHandler{
 		threadService:  threadService,
 		postService:    postService,
 		commentService: commentService,
+		chatService:    chatService,
 	}
 }
 
 func (h *ViewsHandler) Index(c *gin.Context) {
 	threads, err := h.threadService.GetAllThreads()
 	if err != nil {
-		fmt.Printf("Error getting threads: %v\n", err)
 		c.HTML(http.StatusInternalServerError, "error.html", gin.H{
-			"Title":   "Ошибка",
-			"Message": "Не удалось загрузить треды",
+			"error": "Ошибка при получении списка тредов",
 		})
 		return
 	}
 
-	fmt.Printf("Rendering index with %d threads\n", len(threads))
+	chatMessages, err := h.chatService.GetAllMessages()
+	if err != nil {
+		c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+			"error": "Ошибка при получении сообщений чата",
+		})
+		return
+	}
 
 	c.HTML(http.StatusOK, "index.html", gin.H{
-		"Threads": threads,
+		"Threads":      threads,
+		"ChatMessages": chatMessages,
 	})
 }
 

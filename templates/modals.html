@@ -1,0 +1,50 @@
+{{define "modals.html"}}
+<!-- Модальное окно создания треда -->
+<div class="modal fade" id="createThreadModal" tabindex="-1" aria-labelledby="createThreadModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createThreadModalLabel">Создать новый тред</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="createThreadForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="threadTitle" class="form-label">Название треда</label>
+                        <input type="text" class="form-control" id="threadTitle" name="title" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Создать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно редактирования треда -->
+<div class="modal fade" id="editThreadModal" tabindex="-1" aria-labelledby="editThreadModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editThreadModalLabel">Редактировать тред</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editThreadForm">
+                <div class="modal-body">
+                    <input type="hidden" id="editThreadId">
+                    <div class="mb-3">
+                        <label for="editThreadTitle" class="form-label">Название треда</label>
+                        <input type="text" class="form-control" id="editThreadTitle" name="title" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{{end}} 

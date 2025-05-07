@@ -10,14 +10,16 @@ type Services struct {
 	PostService    service.PostService
 	CommentService service.CommentService
 	ThreadService  service.ThreadService
+	ChatService    service.ChatService
 }
 
 func RegisterRoutes(router *gin.Engine, services *Services) {
 	// Инициализация обработчиков
-	viewsHandler := NewViewsHandler(services.ThreadService, services.PostService, services.CommentService)
+	viewsHandler := NewViewsHandler(services.ThreadService, services.PostService, services.CommentService, services.ChatService)
 	threadHandler := NewThreadHandler(services.ThreadService)
 	postHandler := NewPostHandler(services.PostService)
 	commentHandler := NewCommentHandler(services.CommentService)
+	chatHandler := NewChatHandler(services.ChatService)
 
 	// Главная страница
 	router.GET("/", viewsHandler.Index)
@@ -53,6 +55,10 @@ func RegisterRoutes(router *gin.Engine, services *Services) {
 			comments.POST("", commentHandler.CreateComment)
 			comments.DELETE("/:id", commentHandler.DeleteComment)
 		}
+
+		// Чат
+		api.GET("/chat", chatHandler.GetMessages)
+		api.POST("/chat", chatHandler.CreateMessage)
 	}
 
 	// Обработчики ошибок

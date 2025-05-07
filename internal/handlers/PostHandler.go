@@ -36,6 +36,9 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 		return
 	}
 
+	// Устанавливаем author_id = 1 для тестирования
+	post.AuthorID = 1
+
 	if err := h.service.CreatePost(&post); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

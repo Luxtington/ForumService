@@ -77,46 +77,31 @@ func (h *ViewsHandler) GetThreadWithPosts(w http.ResponseWriter, r *http.Request
 }
 
 func (h *ViewsHandler) ShowThread(c *gin.Context) {
+	fmt.Printf("Начало обработки запроса ShowThread\n")
+	
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
+		fmt.Printf("Ошибка при парсинге ID треда: %v\n", err)
 		c.HTML(http.StatusBadRequest, "error.html", gin.H{
-			"Title":   "Ошибка",
-			"Message": "Неверный ID треда",
+			"error": "Неверный ID треда",
 		})
 		return
 	}
+	fmt.Printf("Получение треда с ID: %d\n", id)
 
 	thread, posts, err := h.threadService.GetThreadWithPosts(id)
 	if err != nil {
+		fmt.Printf("Ошибка при получении треда: %v\n", err)
 		c.HTML(http.StatusNotFound, "error.html", gin.H{
-			"Title":   "Ошибка",
-			"Message": "Тред не найден",
+			"error": "Тред не найден",
 		})
 		return
 	}
-
-	userID := 0
-	if user, exists := c.Get("user"); exists {
-		if u, ok := user.(*models.User); ok {
-			userID = u.ID
-		}
-	}
-
-	// Получаем комментарии для каждого поста
-	for i := range posts {
-		comments, err := h.commentService.GetCommentsByPostID(posts[i].ID)
-		if err != nil {
-			comments = make([]models.Comment, 0)
-		}
-		posts[i].Comments = comments
-		
-		// Проверяем права на редактирование
-		posts[i].CanEdit = posts[i].AuthorID == userID
-	}
+	fmt.Printf("Тред найден: %+v\n", thread)
+	fmt.Printf("Количество постов: %d\n", len(posts))
 
 	c.HTML(http.StatusOK, "thread.html", gin.H{
 		"Thread": thread,
 		"Posts":  posts,
-		"User":   c.MustGet("user"),
 	})
 }

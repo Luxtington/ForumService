@@ -1,150 +1,300 @@
-{{define "thread.html"}}
-{{template "base.html" .}}
-{{end}}
-
-{{define "title"}}{{.Thread.Title}}{{end}}
-
-{{define "content"}}
-<div class="container py-4">
-    <nav aria-label="breadcrumb" class="mb-4">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="/">Главная</a></li>
-            <li class="breadcrumb-item active">{{.Thread.Title}}</li>
-        </ol>
-    </nav>
-
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="mb-0">{{.Thread.Title}}</h1>
-        {{if .User}}
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createPostModal">
-            <i class="bi bi-plus-circle"></i> Добавить пост
-        </button>
-        {{end}}
-    </div>
-
-    <div class="posts">
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Тред {{.Thread.Title}}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .thread-title {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #333;
+            padding: 10px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .post {
+            background-color: white;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .post-content {
+            margin-top: 10px;
+            line-height: 1.5;
+            color: #333;
+        }
+        .post-meta {
+            color: #666;
+            font-size: 0.9em;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .no-posts {
+            color: #666;
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+        .btn-edit {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn-edit:hover {
+            background-color: #218838;
+        }
+        .btn-delete {
+            background-color: #dc3545;
+            color: white;
+        }
+        .btn-delete:hover {
+            background-color: #c82333;
+        }
+        .post-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .add-post-btn {
+            margin-bottom: 20px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 5px;
+            width: 80%;
+            max-width: 500px;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .close {
+            font-size: 24px;
+            cursor: pointer;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            min-height: 100px;
+        }
+        .modal-footer {
+            text-align: right;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h1 class="thread-title">{{.Thread.Title}}</h1>
+    
+    <button class="btn btn-primary add-post-btn" onclick="showCreatePostModal()">Добавить пост</button>
+    
+    {{if .Posts}}
         {{range .Posts}}
-        <div class="card mb-4">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="card-title mb-0">{{.Title}}</h5>
-                    {{if .CanEdit}}
-                    <div class="btn-group">
-                        <a href="/posts/{{.ID}}/edit" class="btn btn-outline-primary btn-sm">
-                            <i class="bi bi-pencil"></i> Редактировать
-                        </a>
-                        <form action="/api/posts/{{.ID}}" method="POST" class="d-inline">
-                            <input type="hidden" name="_method" value="DELETE">
-                            <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Вы уверены, что хотите удалить этот пост?')">
-                                <i class="bi bi-trash"></i> Удалить
-                            </button>
-                        </form>
-                    </div>
-                    {{end}}
-                </div>
-                <p class="card-text">{{.Content}}</p>
-                <div class="d-flex justify-content-between align-items-center post-meta">
-                    <div>
-                        <i class="bi bi-person"></i> {{.AuthorName}}
-                        <span class="ms-3">
-                            <i class="bi bi-clock"></i> {{.CreatedAt.Format "02.01.2006 15:04"}}
-                        </span>
-                    </div>
-                    <div>
-                        <span class="badge bg-secondary">
-                            <i class="bi bi-chat"></i> {{if .Comments}}{{len .Comments}}{{else}}0{{end}}
-                        </span>
-                    </div>
-                </div>
-
-                <!-- Комментарии -->
-                <div class="comments mt-4">
-                    <h6 class="mb-3">
-                        <i class="bi bi-chat-dots"></i> Комментарии
-                    </h6>
-                    
-                    {{if .User}}
-                    <form action="/posts/{{.ID}}/comments" method="POST" class="mb-4">
-                        <div class="mb-3">
-                            <textarea class="form-control" name="content" rows="2" placeholder="Напишите комментарий..." required></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-primary btn-sm">
-                            <i class="bi bi-send"></i> Отправить
-                        </button>
-                    </form>
-                    {{end}}
-
-                    {{range .Comments}}
-                    <div class="card mb-2">
-                        <div class="card-body py-2">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <div class="d-flex align-items-center">
-                                    <i class="bi bi-person-circle me-2"></i>
-                                    <strong>{{.AuthorName}}</strong>
-                                </div>
-                                <small class="text-muted">
-                                    <i class="bi bi-clock"></i> {{.CreatedAt.Format "02.01.2006 15:04"}}
-                                </small>
-                            </div>
-                            <p class="card-text mb-0">{{.Content}}</p>
-                            {{if .CanDelete}}
-                            <div class="mt-2">
-                                <form action="/posts/{{$.ID}}/comments/{{.ID}}" method="POST" class="d-inline">
-                                    <input type="hidden" name="_method" value="DELETE">
-                                    <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Вы уверены, что хотите удалить этот комментарий?')">
-                                        <i class="bi bi-trash"></i> Удалить
-                                    </button>
-                                </form>
-                            </div>
-                            {{end}}
-                        </div>
-                    </div>
-                    {{else}}
-                    <div class="text-center text-muted py-3">
-                        <i class="bi bi-chat-square-text"></i>
-                        <p class="mt-2 mb-0">Пока нет комментариев. Будьте первым!</p>
-                    </div>
-                    {{end}}
+        <div class="post">
+            <div class="post-meta">
+                <span>Пост #{{.ID}} • {{.CreatedAt.Format "02.01.2006 15:04"}}</span>
+                <div class="post-actions">
+                    <button class="btn btn-edit" onclick="showEditPostModal({{.ID}}, '{{.Content}}')">Редактировать</button>
+                    <button class="btn btn-delete" onclick="deletePost({{.ID}})">Удалить</button>
                 </div>
             </div>
-        </div>
-        {{else}}
-        <div class="text-center text-muted py-5">
-            <i class="bi bi-chat-square-text display-1"></i>
-            <p class="mt-3">Пока нет постов. Создайте первый!</p>
+            <div class="post-content">
+                {{.Content}}
+            </div>
         </div>
         {{end}}
-    </div>
-</div>
+    {{else}}
+        <div class="no-posts">
+            В этом треде пока нет постов
+        </div>
+    {{end}}
 
-<!-- Модальное окно создания поста -->
-{{if .User}}
-<div class="modal fade" id="createPostModal" tabindex="-1" aria-labelledby="createPostModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+    <!-- Модальное окно создания поста -->
+    <div id="createPostModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="createPostModalLabel">Создать новый пост</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h3>Создать новый пост</h3>
+                <span class="close" onclick="hideCreatePostModal()">&times;</span>
             </div>
-            <form action="/api/posts" method="POST">
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="postTitle" class="form-label">Название поста</label>
-                        <input type="text" class="form-control" id="postTitle" name="title" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="postContent" class="form-label">Содержание</label>
-                        <textarea class="form-control" id="postContent" name="content" rows="5" required></textarea>
-                    </div>
-                    <input type="hidden" name="thread_id" value="{{.Thread.ID}}">
+            <form id="createPostForm">
+                <div class="form-group">
+                    <label for="postContent">Содержание поста:</label>
+                    <textarea id="postContent" name="content" required></textarea>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn" onclick="hideCreatePostModal()">Отмена</button>
                     <button type="submit" class="btn btn-primary">Создать</button>
                 </div>
             </form>
         </div>
     </div>
-</div>
-{{end}}
-{{end}}
+
+    <!-- Модальное окно редактирования поста -->
+    <div id="editPostModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Редактировать пост</h3>
+                <span class="close" onclick="hideEditPostModal()">&times;</span>
+            </div>
+            <form id="editPostForm">
+                <input type="hidden" id="editPostId">
+                <div class="form-group">
+                    <label for="editPostContent">Содержание поста:</label>
+                    <textarea id="editPostContent" name="content" required></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="hideEditPostModal()">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Функции для работы с модальными окнами
+        function showCreatePostModal() {
+            document.getElementById('createPostModal').style.display = 'block';
+        }
+
+        function hideCreatePostModal() {
+            document.getElementById('createPostModal').style.display = 'none';
+        }
+
+        function showEditPostModal(id, content) {
+            document.getElementById('editPostId').value = id;
+            document.getElementById('editPostContent').value = content;
+            document.getElementById('editPostModal').style.display = 'block';
+        }
+
+        function hideEditPostModal() {
+            document.getElementById('editPostModal').style.display = 'none';
+        }
+
+        // Обработчик формы создания поста
+        document.getElementById('createPostForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const content = document.getElementById('postContent').value;
+            
+            fetch('/api/posts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    thread_id: {{.Thread.ID}},
+                    content: content
+                })
+            })
+            .then(response => {
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    alert('Ошибка при создании поста');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Ошибка при создании поста');
+            });
+        });
+
+        // Обработчик формы редактирования поста
+        document.getElementById('editPostForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const id = document.getElementById('editPostId').value;
+            const content = document.getElementById('editPostContent').value;
+            
+            fetch(`/api/posts/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    content: content
+                })
+            })
+            .then(response => {
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    alert('Ошибка при обновлении поста');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Ошибка при обновлении поста');
+            });
+        });
+
+        // Функция удаления поста
+        function deletePost(id) {
+            if (confirm('Вы уверены, что хотите удалить этот пост?')) {
+                fetch(`/api/posts/${id}`, {
+                    method: 'DELETE'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        alert('Ошибка при удалении поста');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Ошибка при удалении поста');
+                });
+            }
+        }
+    </script>
+</body>
+</html>

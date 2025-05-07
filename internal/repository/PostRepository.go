@@ -50,12 +50,7 @@ func (r *postRepository) GetByThreadID(threadID int) ([]*models.Post, error) {
 }
 
 func (r *postRepository) Create(post *models.Post) error {
-	query := `INSERT INTO posts (thread_id, author_id, content) VALUES ($1, $2, $3) RETURNING id, created_at, updated_at`
-	return r.db.QueryRow(query, post.ThreadID, post.AuthorID, post.Content).Scan(
-		&post.ID,
-		&post.CreatedAt,
-		&post.UpdatedAt,
-	)
+	return r.SavePost(post)
 }
 
 func (r *postRepository) Update(post *models.Post) error {
@@ -72,9 +67,9 @@ func (r *postRepository) Delete(id int) error {
 
 func (r *postRepository) SavePost(post *models.Post) error {
 	const query = `
-		INSERT INTO posts (thread_id, user_id, content) 
+		INSERT INTO posts (thread_id, author_id, content) 
 		VALUES ($1, $2, $3)
-		RETURNING id, thread_id, user_id, content, created_at
+		RETURNING id, thread_id, author_id, content, created_at
 	`
 
 	var newPost models.Post
@@ -86,10 +81,11 @@ func (r *postRepository) SavePost(post *models.Post) error {
 		&newPost.CreatedAt,
 	)
 	if err != nil {
-		log.Println("ERROR IN POST REPO 1")
+		log.Printf("Ошибка при создании поста: %v", err)
 		return err
 	}
 
+	*post = newPost
 	return nil
 }
 

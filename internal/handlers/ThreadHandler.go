@@ -21,6 +21,10 @@ type CreateThreadRequest struct {
 	Title string `json:"title" binding:"required"`
 }
 
+type UpdateThreadRequest struct {
+	Title string `json:"title" binding:"required"`
+}
+
 // func (h *ThreadHandler) RegisterRoutes(r *gin.RouterGroup) {
 // 	threads := r.Group("/threads")
 // 	{
@@ -85,4 +89,30 @@ func (h *ThreadHandler) DeleteThread(c *gin.Context) {
 	}
 
 	c.Status(http.StatusNoContent)
+}
+
+func (h *ThreadHandler) UpdateThread(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid thread ID"})
+		return
+	}
+
+	var req UpdateThreadRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	thread := &models.Thread{
+		ID:    id,
+		Title: req.Title,
+	}
+
+	if err := h.service.UpdateThread(thread); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, thread)
 }

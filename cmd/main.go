@@ -3,7 +3,6 @@ package main
 import (
 	"ForumService/internal/config"
 	"ForumService/internal/handlers"
-	"ForumService/internal/middleware"
 	"ForumService/internal/repository"
 	"ForumService/internal/service"
 	"database/sql"
@@ -66,19 +65,17 @@ func main() {
 	router.LoadHTMLFiles(
 		"templates/index.html",
 		"templates/error.html",
+		"templates/thread.html",
 	)
 
 	// Статические файлы
 	router.Static("/static", "./static")
 
-	// Добавление middleware
-	router.Use(middleware.AuthMiddleware(userService))
-
 	// Регистрация маршрутов
 	handlers.RegisterRoutes(router, services)
 
 	// Запуск сервера
-	fmt.Println("Сервер запущен на http://localhost:8081")
+	fmt.Println("Сервер запущен на http://localhost:8080")
 	if err := router.Run(":8080"); err != nil {
 		log.Fatalf("Ошибка запуска сервера: %v", err)
 	}

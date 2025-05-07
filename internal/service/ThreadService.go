@@ -28,19 +28,25 @@ func NewThreadService(threadRepo repository.ThreadRepository, postRepo repositor
 }
 
 func (s *threadService) GetThreadWithPosts(threadID int) (*models.Thread, []*models.Post, error) {
+	fmt.Printf("Получение треда с ID: %d\n", threadID)
 	thread, err := s.threadRepo.GetByID(threadID)
 	if err != nil {
+		fmt.Printf("Ошибка при получении треда из репозитория: %v\n", err)
 		return nil, nil, err
 	}
 	if thread == nil {
+		fmt.Printf("Тред не найден\n")
 		return nil, nil, errors.New("thread not found")
 	}
 
+	fmt.Printf("Тред найден: %+v\n", thread)
 	posts, err := s.postRepo.GetByThreadID(threadID)
 	if err != nil {
+		fmt.Printf("Ошибка при получении постов: %v\n", err)
 		return nil, nil, err
 	}
 
+	fmt.Printf("Получено постов: %d\n", len(posts))
 	return thread, posts, nil
 }
 

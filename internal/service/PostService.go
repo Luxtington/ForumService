@@ -16,6 +16,8 @@ type PostService interface {
 	CreateComment(comment *models.Comment) error
 	GetCommentByID(id int) (*models.Comment, error)
 	DeleteComment(id int) error
+	GetPost(id int) (*models.Post, error)
+	GetPostsByThreadID(threadID int) ([]*models.Post, error)
 }
 
 type postService struct {
@@ -68,4 +70,12 @@ func (s *postService) GetCommentByID(id int) (*models.Comment, error) {
 
 func (s *postService) DeleteComment(id int) error {
 	return s.commentRepo.DeleteComment(id)
+}
+
+func (s *postService) GetPost(id int) (*models.Post, error) {
+	return s.repo.GetPostByID(id)
+}
+
+func (s *postService) GetPostsByThreadID(threadID int) ([]*models.Post, error) {
+	return s.repo.GetByThreadID(threadID)
 }

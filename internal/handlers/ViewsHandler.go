@@ -12,13 +12,15 @@ import (
 )
 
 type ViewsHandler struct {
-	threadService service.ThreadService
+	threadService  service.ThreadService
+	postService    service.PostService
 	commentService service.CommentService
 }
 
-func NewViewsHandler(threadService service.ThreadService, commentService service.CommentService) *ViewsHandler {
+func NewViewsHandler(threadService service.ThreadService, postService service.PostService, commentService service.CommentService) *ViewsHandler {
 	return &ViewsHandler{
-		threadService: threadService,
+		threadService:  threadService,
+		postService:    postService,
 		commentService: commentService,
 	}
 }
@@ -103,5 +105,44 @@ func (h *ViewsHandler) ShowThread(c *gin.Context) {
 	c.HTML(http.StatusOK, "thread.html", gin.H{
 		"Thread": thread,
 		"Posts":  posts,
+	})
+}
+
+func (h *ViewsHandler) ShowPost(c *gin.Context) {
+	fmt.Printf("Начало обработки запроса ShowPost\n")
+	
+	postID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		fmt.Printf("Ошибка при парсинге ID поста: %v\n", err)
+		c.HTML(http.StatusBadRequest, "error.html", gin.H{
+			"error": "Неверный ID поста",
+		})
+		return
+	}
+	fmt.Printf("Получение поста с ID: %d\n", postID)
+
+	post, err := h.postService.GetPost(postID)
+	if err != nil {
+		fmt.Printf("Ошибка при получении поста: %v\n", err)
+		c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+			"error": fmt.Sprintf("Ошибка при получении поста: %v", err),
+		})
+		return
+	}
+	fmt.Printf("Пост найден: %+v\n", post)
+
+	comments, err := h.commentService.GetCommentsByPostID(postID)
+	if err != nil {
+		fmt.Printf("Ошибка при получении комментариев: %v\n", err)
+		c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+			"error": fmt.Sprintf("Ошибка при получении комментариев: %v", err),
+		})
+		return
+	}
+	fmt.Printf("Получено комментариев: %d\n", len(comments))
+
+	c.HTML(http.StatusOK, "post.html", gin.H{
+		"Post":     post,
+		"Comments": comments,
 	})
 }

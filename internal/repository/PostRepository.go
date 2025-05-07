@@ -90,29 +90,28 @@ func (r *postRepository) SavePost(post *models.Post) error {
 }
 
 func (r *postRepository) GetPostByID(id int) (*models.Post, error) {
-	const query = `
-		SELECT 
-			p.id, p.thread_id, p.content, p.created_at,
-			u.id as author_id, u.username as author_username
-		FROM posts p
-		JOIN users u ON p.user_id = u.id
-		WHERE p.id = $1
-	`
+	query := `
+		SELECT id, thread_id, author_id, content, created_at, updated_at
+		FROM posts
+		WHERE id = $1`
 
-	var post models.Post
+	post := &models.Post{}
 	err := r.db.QueryRow(query, id).Scan(
 		&post.ID,
 		&post.ThreadID,
+		&post.AuthorID,
 		&post.Content,
 		&post.CreatedAt,
-		&post.AuthorID,
+		&post.UpdatedAt,
 	)
-
 	if err != nil {
-		log.Println("ERROR IN POST REPO 2")
-		return nil, err
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("пост не найден")
+		}
+		return nil, fmt.Errorf("ошибка при получении поста: %v", err)
 	}
-	return &post, nil
+
+	return post, nil
 }
 
 func (r *postRepository) GetPostWithComments(postID int) (*models.Post, []models.Comment, error) {

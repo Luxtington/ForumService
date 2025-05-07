@@ -14,7 +14,7 @@ type Services struct {
 
 func RegisterRoutes(router *gin.Engine, services *Services) {
 	// Инициализация обработчиков
-	viewsHandler := NewViewsHandler(services.ThreadService, services.CommentService)
+	viewsHandler := NewViewsHandler(services.ThreadService, services.PostService, services.CommentService)
 	threadHandler := NewThreadHandler(services.ThreadService)
 	postHandler := NewPostHandler(services.PostService)
 	commentHandler := NewCommentHandler(services.CommentService)
@@ -24,6 +24,7 @@ func RegisterRoutes(router *gin.Engine, services *Services) {
 
 	// Маршруты для отображения страниц
 	router.GET("/threads/:id", viewsHandler.ShowThread)
+	router.GET("/posts/:id", viewsHandler.ShowPost)
 
 	// API маршруты
 	api := router.Group("/api")

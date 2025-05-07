@@ -142,7 +142,9 @@
         {{range .Posts}}
         <div class="post">
             <div class="post-meta">
-                <span>Пост #{{.ID}} • {{.CreatedAt.Format "02.01.2006 15:04"}}</span>
+                <a href="/posts/{{.ID}}" style="text-decoration: none; color: inherit;">
+                    Пост #{{.ID}} • {{.CreatedAt.Format "02.01.2006 15:04"}}
+                </a>
                 <div class="post-actions">
                     <button class="btn btn-edit" onclick="showEditPostModal({{.ID}}, '{{.Content}}')">Редактировать</button>
                     <button class="btn btn-delete" onclick="deletePost({{.ID}})">Удалить</button>

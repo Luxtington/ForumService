@@ -61,14 +61,8 @@ func main() {
 	// Инициализация роутера
 	router := gin.Default()
 
-	// Загрузка HTML-шаблонов
-	router.LoadHTMLFiles(
-		"templates/index.html",
-		"templates/error.html",
-		"templates/thread.html",
-	)
-
-	// Статические файлы
+	// Загрузка шаблонов
+	router.LoadHTMLGlob("templates/*")
 	router.Static("/static", "./static")
 
 	// Регистрация маршрутов

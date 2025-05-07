@@ -20,11 +20,14 @@ func (r *CommentRepositoryImpl) SaveComment(comment *models.Comment) error {
 }
 
 func (r *CommentRepositoryImpl) GetCommentByID(id int) (*models.Comment, error) {
-	const query = `SELECT * FROM comments WHERE id = $1 RETURNING id, post_id, author_id, content, created_at`
+	const query = `SELECT id, post_id, author_id, content, created_at FROM comments WHERE id = $1`
 	comment := &models.Comment{}
-	err := r.db.QueryRow(query, id).Scan(&comment.ID, &comment.PostID, &comment.AuthorID, &comment.Content, comment.CreatedAt)
+	err := r.db.QueryRow(query, id).Scan(&comment.ID, &comment.PostID, &comment.AuthorID, &comment.Content, &comment.CreatedAt)
 	if err != nil {
-		return nil, err
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("комментарий не найден")
+		}
+		return nil, fmt.Errorf("ошибка при получении комментария: %v", err)
 	}
 	return comment, nil
 }
@@ -69,40 +72,35 @@ func (r *CommentRepositoryImpl) DeleteComment(id int) error {
 
 func (r *CommentRepositoryImpl) GetCommentsByPostID(postID int) ([]models.Comment, error) {
 	const query = `
-        SELECT
-            c.id, c.post_id, c.content, c.created_at,
-            u.id as author_id
-        FROM comments c
-        JOIN users u ON c.user_id = u.id
-        WHERE c.post_id = $1
-        ORDER BY c.created_at
-    `
+        SELECT id, post_id, author_id, content, created_at
+        FROM comments
+        WHERE post_id = $1
+        ORDER BY created_at ASC`
 
 	rows, err := r.db.Query(query, postID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query comments: %w", err)
+		return nil, fmt.Errorf("ошибка при получении комментариев: %v", err)
 	}
 	defer rows.Close()
 
 	var comments []models.Comment
 	for rows.Next() {
-		var c models.Comment
+		var comment models.Comment
 		err := rows.Scan(
-			&c.ID,
-			&c.PostID,
-			&c.Content,
-			&c.CreatedAt,
-			&c.AuthorID,
+			&comment.ID,
+			&comment.PostID,
+			&comment.AuthorID,
+			&comment.Content,
+			&comment.CreatedAt,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to scan comment: %w", err)
+			return nil, fmt.Errorf("ошибка при сканировании комментария: %v", err)
 		}
-		comments = append(comments, c)
+		comments = append(comments, comment)
 	}
 
-	// Проверка ошибок после цикла
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating comments rows: %w", err)
+		return nil, fmt.Errorf("ошибка после сканирования комментариев: %v", err)
 	}
 
 	return comments, nil

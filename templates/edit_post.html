@@ -1,0 +1,34 @@
+{{define "content"}}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="mb-0">
+                    <i class="bi bi-pencil"></i> Редактирование поста
+                </h3>
+            </div>
+            <div class="card-body">
+                <form action="/posts/{{.Post.ID}}" method="POST">
+                    <input type="hidden" name="_method" value="PUT">
+                    <div class="mb-3">
+                        <label for="title" class="form-label">Заголовок</label>
+                        <input type="text" class="form-control" id="title" name="title" value="{{.Post.Title}}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="content" class="form-label">Содержание</label>
+                        <textarea class="form-control" id="content" name="content" rows="5" required>{{.Post.Content}}</textarea>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> Сохранить изменения
+                        </button>
+                        <a href="/posts/{{.Post.ID}}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Назад к посту
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{{end}} 

@@ -1,0 +1,11 @@
+database:
+  host: localhost
+  port: 5432
+  user: postgres
+  password: postgres
+  dbname: forum
+  sslmode: disable
+  driver: postgres
+  max_open_conns: 25
+  max_idle_conns: 25
+  conn_max_lifetime: 5m 

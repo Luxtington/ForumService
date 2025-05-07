@@ -1,0 +1,151 @@
+{{define "index.html"}}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Форум</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .navbar {
+            background: linear-gradient(135deg, #6B73FF 0%, #000DFF 100%);
+            padding: 1rem 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,.1);
+        }
+        .navbar-brand {
+            color: white !important;
+            font-size: 1.5rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .navbar-brand:hover {
+            color: rgba(255,255,255,0.9) !important;
+        }
+        .card {
+            border: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,.05);
+            transition: transform 0.2s;
+            background: white;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,.1);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #6B73FF 0%, #000DFF 100%);
+            border: none;
+            padding: 0.5rem 1.5rem;
+            font-weight: 500;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #5A62FF 0%, #0009FF 100%);
+            transform: translateY(-1px);
+        }
+        .container {
+            max-width: 1200px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-chat-square-text me-2"></i>Форум
+            </a>
+        </div>
+    </nav>
+
+    <div class="container py-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="mb-0">Треды</h1>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createThreadModal">
+                <i class="bi bi-plus-circle"></i> Создать тред
+            </button>
+        </div>
+
+        <div class="row">
+            {{range .Threads}}
+            <div class="col-12 mb-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <a href="/threads/{{.ID}}" class="text-decoration-none">{{.Title}}</a>
+                        </h5>
+                        <p class="card-text text-muted">
+                            <small>
+                                <i class="bi bi-clock"></i> {{.CreatedAt.Format "02.01.2006 15:04"}}
+                            </small>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {{else}}
+            <div class="col-12">
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-chat-square-text display-1"></i>
+                    <p class="mt-3">Пока нет тредов. Создайте первый!</p>
+                </div>
+            </div>
+            {{end}}
+        </div>
+    </div>
+
+    <!-- Модальное окно создания треда -->
+    <div class="modal fade" id="createThreadModal" tabindex="-1" aria-labelledby="createThreadModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createThreadModalLabel">Создать новый тред</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="createThreadForm">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="threadTitle" class="form-label">Название треда</label>
+                            <input type="text" class="form-control" id="threadTitle" name="title" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-primary">Создать</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    document.getElementById('createThreadForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const title = document.getElementById('threadTitle').value;
+        
+        fetch('/api/threads', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ title: title })
+        })
+        .then(response => {
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert('Ошибка при создании треда');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Ошибка при создании треда');
+        });
+    });
+    </script>
+</body>
+</html>
+{{end}}

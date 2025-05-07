@@ -1,0 +1,21 @@
+{{define "content"}}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3>Создать комментарий</h3>
+            </div>
+            <div class="card-body">
+                <form action="/comments/create" method="POST">
+                    <input type="hidden" name="post_id" value="{{.PostID}}">
+                    <div class="mb-3">
+                        <label for="content" class="form-label">Текст комментария</label>
+                        <textarea class="form-control" id="content" name="content" rows="4" required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Отправить</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{{end}} 

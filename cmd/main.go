@@ -15,7 +15,7 @@ import (
 
 func main() {
 	// Загрузка конфигурации
-	cfg, err := config.LoadConfig("config/database.yaml")
+	cfg, err := config.LoadConfig("../config/database.yaml")
 	if err != nil {
 		log.Fatalf("Ошибка загрузки конфигурации: %v", err)
 	}
@@ -65,8 +65,8 @@ func main() {
 	router := gin.Default()
 
 	// Загрузка шаблонов
-	router.LoadHTMLGlob("templates/*")
-	router.Static("/static", "./static")
+	router.LoadHTMLGlob("../templates/*")
+	router.Static("/static", "../static")
 
 	// Регистрация маршрутов
 	handlers.RegisterRoutes(router, services)

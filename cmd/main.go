@@ -1,79 +1,78 @@
 package main
 
 import (
-	"ForumService/internal/config"
 	"ForumService/internal/handlers"
+	"ForumService/internal/middleware"
 	"ForumService/internal/repository"
 	"ForumService/internal/service"
 	"database/sql"
-	"fmt"
 	"github.com/gin-gonic/gin"
-	_ "html/template"
 	_ "github.com/lib/pq"
 	"log"
 )
 
 func main() {
-	// Загрузка конфигурации
-	cfg, err := config.LoadConfig("../config/database.yaml")
-	if err != nil {
-		log.Fatalf("Ошибка загрузки конфигурации: %v", err)
-	}
-
 	// Подключение к базе данных
-	db, err := sql.Open("postgres", cfg.Database.GetDSN())
+	dsn := "host=localhost user=postgres password=postgres dbname=forum port=5432 sslmode=disable"
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		log.Fatalf("Ошибка подключения к базе данных: %v", err)
+		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
 
-	// Настройка пула соединений
-	db.SetMaxOpenConns(cfg.Database.MaxOpenConns)
-	db.SetMaxIdleConns(cfg.Database.MaxIdleConns)
-	db.SetConnMaxLifetime(cfg.Database.ConnMaxLifetime)
-
 	// Проверка подключения
-	err = db.Ping()
-	if err != nil {
-		log.Fatalf("Ошибка проверки подключения к базе данных: %v", err)
+	if err := db.Ping(); err != nil {
+		log.Fatalf("Failed to ping database: %v", err)
 	}
 
 	// Инициализация репозиториев
 	threadRepo := repository.NewThreadRepository(db)
 	postRepo := repository.NewPostRepository(db)
 	commentRepo := repository.NewCommentRepository(db)
-	chatRepo := repository.NewChatMessageRepository(db)
-	userRepo := repository.NewUserRepository(db)
 
 	// Инициализация сервисов
 	threadService := service.NewThreadService(threadRepo, postRepo)
 	postService := service.NewPostService(postRepo, commentRepo)
 	commentService := service.NewCommentService(commentRepo)
-	chatService := service.NewChatService(chatRepo)
-	userService := service.NewUserService(userRepo)
 
-	// Создание структуры сервисов для роутера
-	services := &handlers.Services{
-		ThreadService:  threadService,
-		PostService:    postService,
-		CommentService: commentService,
-		UserService:    userService,
-		ChatService:    chatService,
+	// Инициализация обработчиков
+	threadHandler := handlers.NewThreadHandler(threadService)
+	postHandler := handlers.NewPostHandler(postService)
+	commentHandler := handlers.NewCommentHandler(commentService)
+
+	// Создание экземпляра Gin
+	r := gin.Default()
+
+	// Инициализация middleware для аутентификации
+	authMiddleware := middleware.AuthServiceMiddleware("http://localhost:8081")
+
+	// Группа защищенных маршрутов
+	protected := r.Group("/api")
+	protected.Use(authMiddleware)
+	{
+		// Маршруты для тредов
+		protected.POST("/threads", threadHandler.CreateThread)
+		protected.PUT("/threads/:id", threadHandler.UpdateThread)
+		protected.DELETE("/threads/:id", threadHandler.DeleteThread)
+
+		// Маршруты для постов
+		protected.POST("/posts", postHandler.CreatePost)
+		protected.PUT("/posts/:id", postHandler.UpdatePost)
+		protected.DELETE("/posts/:id", postHandler.DeletePost)
+
+		// Маршруты для комментариев
+		protected.POST("/comments", commentHandler.CreateComment)
+		protected.DELETE("/comments/:id", commentHandler.DeleteComment)
 	}
 
-	// Инициализация роутера
-	router := gin.Default()
-
-	// Загрузка шаблонов
-	router.LoadHTMLGlob("../templates/*")
-	router.Static("/static", "../static")
-
-	// Регистрация маршрутов
-	handlers.RegisterRoutes(router, services)
+	// Публичные маршруты
+	// Получение всех тредов
+	r.GET("/threads", threadHandler.GetAllThreads)
+	// Получение конкретного треда с постами
+	r.GET("/threads/:id", threadHandler.GetThreadWithPosts)
 
 	// Запуск сервера
-	fmt.Println("Сервер запущен на http://localhost:8080")
-	if err := router.Run(":8080"); err != nil {
-		log.Fatalf("Ошибка запуска сервера: %v", err)
+	if err := r.Run(":8080"); err != nil {
+		log.Fatalf("Failed to start server: %v", err)
 	}
 }

@@ -1,0 +1,30 @@
+{{define "title"}}Список тредов{{end}}
+
+{{define "content"}}
+<div class="container mt-4">
+    <h1>Список тредов</h1>
+    
+    <div class="row">
+        {{range .threads}}
+        <div class="col-md-12 mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <a href="/threads/{{.ID}}" class="text-decoration-none">{{.Title}}</a>
+                    </h5>
+                    <p class="card-text">
+                        <small class="text-muted">
+                            Автор: {{.AuthorName}} | 
+                            Создан: {{.CreatedAt.Format "02.01.2006 15:04"}} | 
+                            Обновлен: {{.UpdatedAt.Format "02.01.2006 15:04"}}
+                        </small>
+                    </p>
+                </div>
+            </div>
+        </div>
+        {{end}}
+    </div>
+</div>
+{{end}}
+
+{{template "base.html" .}} 

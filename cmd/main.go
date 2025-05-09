@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 	"log"
+	"strconv"
 )
 
 func main() {
@@ -29,19 +30,27 @@ func main() {
 	threadRepo := repository.NewThreadRepository(db)
 	postRepo := repository.NewPostRepository(db)
 	commentRepo := repository.NewCommentRepository(db)
+	chatRepo := repository.NewChatMessageRepository(db)
 
 	// Инициализация сервисов
 	threadService := service.NewThreadService(threadRepo, postRepo)
 	postService := service.NewPostService(postRepo, commentRepo)
 	commentService := service.NewCommentService(commentRepo)
+	chatService := service.NewChatService(chatRepo)
 
 	// Инициализация обработчиков
 	threadHandler := handlers.NewThreadHandler(threadService)
 	postHandler := handlers.NewPostHandler(postService)
 	commentHandler := handlers.NewCommentHandler(commentService)
+	chatHandler := handlers.NewChatHandler(chatService)
 
 	// Создание экземпляра Gin
 	r := gin.Default()
+
+	// Загрузка HTML шаблонов
+	r.LoadHTMLGlob("templates/*")
+	// Настройка статических файлов
+	r.Static("/static", "./static")
 
 	// Инициализация middleware для аутентификации
 	authMiddleware := middleware.AuthServiceMiddleware("http://localhost:8081")
@@ -63,13 +72,55 @@ func main() {
 		// Маршруты для комментариев
 		protected.POST("/comments", commentHandler.CreateComment)
 		protected.DELETE("/comments/:id", commentHandler.DeleteComment)
+
+		// Маршруты для чата
+		protected.POST("/chat", chatHandler.CreateMessage)
+		protected.GET("/chat", chatHandler.GetMessages)
 	}
 
 	// Публичные маршруты
-	// Получение всех тредов
-	r.GET("/threads", threadHandler.GetAllThreads)
-	// Получение конкретного треда с постами
-	r.GET("/threads/:id", threadHandler.GetThreadWithPosts)
+	// Главная страница со списком тредов
+	r.GET("/", func(c *gin.Context) {
+		c.HTML(200, "index.html", gin.H{
+			"title": "Главная страница",
+		})
+	})
+
+	// Получение всех тредов (HTML)
+	r.GET("/threads", func(c *gin.Context) {
+		threads, err := threadService.GetAllThreads()
+		if err != nil {
+			c.HTML(500, "error.html", gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+		c.HTML(200, "threads.html", gin.H{
+			"threads": threads,
+		})
+	})
+
+	// Получение конкретного треда с постами (HTML)
+	r.GET("/threads/:id", func(c *gin.Context) {
+		id, err := strconv.Atoi(c.Param("id"))
+		if err != nil {
+			c.HTML(400, "bad_request.html", gin.H{
+				"error": "Неверный ID треда",
+			})
+			return
+		}
+		thread, posts, err := threadService.GetThreadWithPosts(id)
+		if err != nil {
+			c.HTML(404, "not_found.html", gin.H{
+				"error": "Тред не найден",
+			})
+			return
+		}
+		c.HTML(200, "thread.html", gin.H{
+			"thread": thread,
+			"posts":  posts,
+		})
+	})
 
 	// Запуск сервера
 	if err := r.Run(":8080"); err != nil {

@@ -3,6 +3,7 @@ package middleware
 import (
     "github.com/gin-gonic/gin"
     "net/http"
+    "encoding/json"
 )
 
 // AuthServiceMiddleware проверяет JWT токен через AuthService
@@ -44,6 +45,18 @@ func AuthServiceMiddleware(authServiceURL string) gin.HandlerFunc {
             return
         }
 
+        // Получаем данные пользователя из ответа
+        var user struct {
+            ID int `json:"id"`
+        }
+        if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при получении данных пользователя"})
+            c.Abort()
+            return
+        }
+
+        // Добавляем ID пользователя в контекст
+        c.Set("user_id", user.ID)
         c.Next()
     }
 } 

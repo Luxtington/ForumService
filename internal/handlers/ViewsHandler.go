@@ -133,7 +133,7 @@ func (h *ViewsHandler) ShowPost(c *gin.Context) {
 	}
 	fmt.Printf("Получение поста с ID: %d\n", postID)
 
-	post, err := h.postService.GetPost(postID)
+	post, comments, err := h.postService.GetPostWithComments(postID)
 	if err != nil {
 		fmt.Printf("Ошибка при получении поста: %v\n", err)
 		c.HTML(http.StatusInternalServerError, "error.html", gin.H{
@@ -142,19 +142,10 @@ func (h *ViewsHandler) ShowPost(c *gin.Context) {
 		return
 	}
 	fmt.Printf("Пост найден: %+v\n", post)
-
-	comments, err := h.commentService.GetCommentsByPostID(postID)
-	if err != nil {
-		fmt.Printf("Ошибка при получении комментариев: %v\n", err)
-		c.HTML(http.StatusInternalServerError, "error.html", gin.H{
-			"error": fmt.Sprintf("Ошибка при получении комментариев: %v", err),
-		})
-		return
-	}
 	fmt.Printf("Получено комментариев: %d\n", len(comments))
 
 	c.HTML(http.StatusOK, "post.html", gin.H{
-		"Post":     post,
-		"Comments": comments,
+		"post":     post,
+		"comments": comments,
 	})
 }

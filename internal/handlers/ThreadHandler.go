@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
-	"fmt"
 )
 
 type ThreadHandler struct {
@@ -35,21 +34,24 @@ type UpdateThreadRequest struct {
 // }
 
 func (h *ThreadHandler) CreateThread(c *gin.Context) {
-	var req CreateThreadRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		fmt.Printf("Ошибка при разборе JSON: %v\n", err)
+	var request struct {
+		Title string `json:"title" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Для тестирования используем фиксированный ID пользователя
-	thread := &models.Thread{
-		Title: req.Title,
-		AuthorID: 1, // Фиксированный ID для тестирования
+	// Получаем ID пользователя из контекста
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "пользователь не аутентифицирован"})
+		return
 	}
 
-	if err := h.service.CreateThread(thread); err != nil {
-		fmt.Printf("Ошибка при создании треда: %v\n", err)
+	thread, err := h.service.CreateThread(request.Title, userID.(int))
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

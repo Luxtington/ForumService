@@ -9,7 +9,7 @@ import (
 
 type ThreadService interface {
 	GetThreadWithPosts(threadID int) (*models.Thread, []*models.Post, error)
-	CreateThread(thread *models.Thread) error
+	CreateThread(title string, authorID int) (*models.Thread, error)
 	UpdateThread(thread *models.Thread) error
 	DeleteThread(threadID int) error
 	GetAllThreads() ([]*models.Thread, error)
@@ -50,8 +50,17 @@ func (s *threadService) GetThreadWithPosts(threadID int) (*models.Thread, []*mod
 	return thread, posts, nil
 }
 
-func (s *threadService) CreateThread(thread *models.Thread) error {
-	return s.threadRepo.Create(thread)
+func (s *threadService) CreateThread(title string, authorID int) (*models.Thread, error) {
+	thread := &models.Thread{
+		Title:    title,
+		AuthorID: authorID,
+	}
+
+	if err := s.threadRepo.Create(thread); err != nil {
+		return nil, err
+	}
+
+	return thread, nil
 }
 
 func (s *threadService) UpdateThread(thread *models.Thread) error {

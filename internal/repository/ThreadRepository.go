@@ -35,13 +35,29 @@ func (r *threadRepository) GetByID(id int) (*models.Thread, error) {
 }
 
 func (r *threadRepository) Create(thread *models.Thread) error {
+	query := `INSERT INTO threads (title, author_id, created_at, updated_at) 
+			  VALUES ($1, $2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) 
+			  RETURNING id, title, author_id, created_at, updated_at`
+	
 	fmt.Printf("Создание треда: title=%s, author_id=%d\n", thread.Title, thread.AuthorID)
-	query := `INSERT INTO threads (title, author_id) VALUES ($1, $2) RETURNING id, created_at, updated_at`
-	return r.db.QueryRow(query, thread.Title, thread.AuthorID).Scan(
+	
+	err := r.db.QueryRow(query, thread.Title, thread.AuthorID).Scan(
 		&thread.ID,
+		&thread.Title,
+		&thread.AuthorID,
 		&thread.CreatedAt,
 		&thread.UpdatedAt,
 	)
+	
+	if err != nil {
+		fmt.Printf("Ошибка при создании треда: %v\n", err)
+		return err
+	}
+	
+	fmt.Printf("Тред создан: id=%d, title=%s, author_id=%d, created_at=%v\n", 
+		thread.ID, thread.Title, thread.AuthorID, thread.CreatedAt)
+	
+	return nil
 }
 
 func (r *threadRepository) Update(thread *models.Thread) error {

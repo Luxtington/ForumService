@@ -11,10 +11,10 @@ type ChatService interface {
 }
 
 type chatService struct {
-    repo *repository.ChatMessageRepository
+    repo repository.ChatRepository
 }
 
-func NewChatService(repo *repository.ChatMessageRepository) ChatService {
+func NewChatService(repo repository.ChatRepository) ChatService {
     return &chatService{repo: repo}
 }
 

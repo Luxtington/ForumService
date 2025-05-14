@@ -138,28 +138,30 @@
     
     <button class="btn btn-primary add-post-btn" onclick="showCreatePostModal()">Добавить пост</button>
     
-    {{if .Posts}}
-        {{range .Posts}}
-        <div class="post">
-            <div class="post-meta">
-                <a href="/posts/{{.ID}}" style="text-decoration: none; color: inherit;">
-                    Пост #{{.ID}} • {{.CreatedAt.Format "02.01.2006 15:04"}}
-                </a>
-                <div class="post-actions">
-                    <button class="btn btn-edit" onclick="showEditPostModal({{.ID}}, '{{.Content}}')">Редактировать</button>
-                    <button class="btn btn-delete" onclick="deletePost({{.ID}})">Удалить</button>
+    <div class="thread-posts">
+        {{if .Posts}}
+            {{range .Posts}}
+            <div class="post">
+                <div class="post-meta">
+                    <a href="/posts/{{.id}}" style="text-decoration: none; color: inherit;">
+                        Пост #{{.id}} • {{.created_at.Format "02.01.2006 15:04"}}
+                    </a>
+                    <div class="post-actions">
+                        <button class="btn btn-edit" onclick="showEditPostModal({{.id}}, '{{.content}}')">Редактировать</button>
+                        <button class="btn btn-delete" onclick="deletePost({{.id}})">Удалить</button>
+                    </div>
+                </div>
+                <div class="post-content">
+                    {{.content}}
                 </div>
             </div>
-            <div class="post-content">
-                {{.Content}}
+            {{end}}
+        {{else}}
+            <div class="no-posts">
+                В этом треде пока нет постов
             </div>
-        </div>
         {{end}}
-    {{else}}
-        <div class="no-posts">
-            В этом треде пока нет постов
-        </div>
-    {{end}}
+    </div>
 
     <!-- Модальное окно создания поста -->
     <div id="createPostModal" class="modal">
@@ -226,6 +228,9 @@
         document.getElementById('createPostForm').addEventListener('submit', function(e) {
             e.preventDefault();
             const content = document.getElementById('postContent').value;
+            const threadId = window.location.pathname.split('/').pop(); // Получаем ID треда из URL
+            
+            console.log('Отправка запроса на создание поста:', { thread_id: threadId, content: content });
             
             fetch('/api/posts', {
                 method: 'POST',
@@ -233,20 +238,50 @@
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    thread_id: {{.Thread.ID}},
+                    thread_id: parseInt(threadId),
                     content: content
                 })
             })
             .then(response => {
+                console.log('Получен ответ:', response.status);
                 if (response.ok) {
-                    window.location.reload();
+                    return response.json();
                 } else {
-                    alert('Ошибка при создании поста');
+                    throw new Error('Ошибка при создании поста');
+                }
+            })
+            .then(post => {
+                console.log('Получен пост:', post);
+                // Добавляем новый пост на страницу без перезагрузки
+                const postsContainer = document.querySelector('.thread-posts');
+                if (postsContainer) {
+                    const postElement = document.createElement('div');
+                    postElement.className = 'post';
+                    postElement.innerHTML = `
+                        <div class="post-meta">
+                            <a href="/posts/${post.id}" style="text-decoration: none; color: inherit;">
+                                Пост #${post.id} • ${new Date(post.created_at).toLocaleString()}
+                            </a>
+                            <div class="post-actions">
+                                <button class="btn btn-edit" onclick="showEditPostModal(${post.id}, '${post.content}')">Редактировать</button>
+                                <button class="btn btn-delete" onclick="deletePost(${post.id})">Удалить</button>
+                            </div>
+                        </div>
+                        <div class="post-content">
+                            ${post.content}
+                        </div>
+                    `;
+                    postsContainer.insertBefore(postElement, postsContainer.firstChild);
+                    document.getElementById('postContent').value = '';
+                    hideCreatePostModal();
+                } else {
+                    console.error('Не найден контейнер для постов');
+                    window.location.reload();
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Ошибка при создании поста');
+                alert(error.message);
             });
         });
 

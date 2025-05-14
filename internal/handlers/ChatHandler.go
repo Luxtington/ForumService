@@ -24,8 +24,14 @@ func (h *ChatHandler) CreateMessage(c *gin.Context) {
         return
     }
 
-    // Для тестирования используем фиксированный ID пользователя
-    message, err := h.service.CreateMessage(1, request.Content)
+    // Получаем ID пользователя из контекста
+    userID, exists := c.Get("user_id")
+    if !exists {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "пользователь не аутентифицирован"})
+        return
+    }
+
+    message, err := h.service.CreateMessage(userID.(int), request.Content)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return

@@ -120,9 +120,10 @@ func (r *postRepository) GetPostWithComments(postID int) (*models.Post, []models
 		log.Println("ERROR IN POST REPO 4")
 		return nil, nil, err
 	}
-	const query = `SELECT c.id, c.post_id, c.author_id, c.content, c.created_at
-                   FROM comments c
-                   WHERE c.post_id = $1
+
+	const query = `SELECT id, post_id, author_id, content, created_at
+                   FROM comments
+                   WHERE post_id = $1
                    ORDER BY created_at ASC`
 
 	rows, err := r.db.Query(query, postID)

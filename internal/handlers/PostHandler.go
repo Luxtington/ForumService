@@ -30,16 +30,30 @@ func (h *PostHandler) ShowCreateForm(c *gin.Context) {
 }
 
 func (h *PostHandler) CreatePost(c *gin.Context) {
-	var post models.Post
-	if err := c.ShouldBindJSON(&post); err != nil {
+	var request struct {
+		ThreadID int    `json:"thread_id" binding:"required"`
+		Content  string `json:"content" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Устанавливаем author_id = 1 для тестирования
-	post.AuthorID = 1
+	// Получаем ID пользователя из контекста
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "пользователь не аутентифицирован"})
+		return
+	}
 
-	if err := h.service.CreatePost(&post); err != nil {
+	post := &models.Post{
+		ThreadID: request.ThreadID,
+		AuthorID: userID.(int),
+		Content:  request.Content,
+	}
+
+	if err := h.service.CreatePost(post); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

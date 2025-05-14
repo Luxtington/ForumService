@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Пост #{{.Post.ID}}</title>
+    <title>Пост #{{.post.id}}</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -66,20 +66,23 @@
         .btn-primary:hover {
             background-color: #0056b3;
         }
+        .btn-delete {
+            background-color: #dc3545;
+            color: white;
+        }
+        .btn-delete:hover {
+            background-color: #c82333;
+        }
         .comment-form {
-            background-color: white;
-            padding: 20px;
-            border-radius: 5px;
-            margin-top: 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
         }
         .comment-form textarea {
             width: 100%;
+            min-height: 100px;
             padding: 10px;
+            margin-bottom: 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
-            min-height: 100px;
-            margin-bottom: 10px;
             resize: vertical;
         }
         .back-link {
@@ -91,48 +94,37 @@
         .back-link:hover {
             color: #333;
         }
-        .btn-delete {
-            background-color: #dc3545;
-            color: white;
-            padding: 4px 8px;
-            font-size: 12px;
-        }
-        .btn-delete:hover {
-            background-color: #c82333;
-        }
     </style>
 </head>
 <body>
-    <a href="/threads/{{.Post.ThreadID}}" class="back-link">← Назад к треду</a>
+    <a href="/threads/{{.post.thread_id}}" class="back-link">← Назад к треду</a>
 
     <div class="post">
         <div class="post-meta">
-            Пост #{{.Post.ID}} • {{.Post.CreatedAt.Format "02.01.2006 15:04"}}
+            <span>Пост #{{.post.id}} • {{.post.created_at.Format "02.01.2006 15:04"}}</span>
         </div>
         <div class="post-content">
-            {{.Post.Content}}
+            {{.post.content}}
         </div>
     </div>
 
     <div class="comments-section">
         <h3>Комментарии</h3>
         
-        <div class="comment-form">
-            <form id="commentForm">
-                <textarea name="content" placeholder="Напишите комментарий..." required></textarea>
-                <button type="submit" class="btn btn-primary">Отправить комментарий</button>
-            </form>
-        </div>
+        <form id="commentForm" class="comment-form">
+            <textarea name="content" placeholder="Напишите комментарий..." required></textarea>
+            <button type="submit" class="btn btn-primary">Отправить</button>
+        </form>
 
-        {{if .Comments}}
-            {{range .Comments}}
+        {{if .comments}}
+            {{range .comments}}
             <div class="comment">
                 <div class="comment-meta">
-                    <span>Комментарий #{{.ID}} • {{.CreatedAt.Format "02.01.2006 15:04"}}</span>
-                    <button class="btn btn-delete" onclick="deleteComment({{.ID}})">Удалить</button>
+                    <span>Комментарий #{{.id}} • {{.created_at.Format "02.01.2006 15:04"}}</span>
+                    <button class="btn btn-delete" onclick="deleteComment({{.id}})">Удалить</button>
                 </div>
                 <div class="comment-content">
-                    {{.Content}}
+                    {{.content}}
                 </div>
             </div>
             {{end}}
@@ -150,26 +142,33 @@
             e.preventDefault();
             const content = this.querySelector('textarea[name="content"]').value;
             
+            console.log('Отправка комментария:', { post_id: {{.post.id}}, content: content });
+            
             fetch('/api/comments', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    post_id: {{.Post.ID}},
+                    post_id: {{.post.id}},
                     content: content
                 })
             })
             .then(response => {
+                console.log('Получен ответ:', response.status);
                 if (response.ok) {
-                    window.location.reload();
+                    return response.json();
                 } else {
-                    alert('Ошибка при создании комментария');
+                    throw new Error('Ошибка при создании комментария');
                 }
+            })
+            .then(comment => {
+                console.log('Получен комментарий:', comment);
+                window.location.reload();
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Ошибка при создании комментария');
+                alert(error.message);
             });
         });
 

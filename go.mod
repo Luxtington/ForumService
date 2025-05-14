@@ -5,13 +5,17 @@ go 1.23.0
 toolchain go1.23.6
 
 require (
+	github.com/gin-contrib/cors v1.5.0
 	github.com/gin-gonic/gin v1.10.0
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.10.9
 )
 
-require golang.org/x/crypto v0.33.0 // indirect
+require (
+	github.com/kr/text v0.2.0 // indirect
+	golang.org/x/crypto v0.33.0 // indirect
+)
 
 require (
 	github.com/bytedance/sonic v1.11.6 // indirect

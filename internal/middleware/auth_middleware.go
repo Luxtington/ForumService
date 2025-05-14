@@ -8,8 +8,8 @@ import (
 // AuthServiceMiddleware проверяет JWT токен через AuthService
 func AuthServiceMiddleware(authServiceURL string) gin.HandlerFunc {
     return func(c *gin.Context) {
-        token := c.GetHeader("Authorization")
-        if token == "" {
+        token, err := c.Cookie("auth_token")
+        if err != nil {
             c.JSON(http.StatusUnauthorized, gin.H{"error": "требуется аутентификация"})
             c.Abort()
             return
@@ -22,7 +22,12 @@ func AuthServiceMiddleware(authServiceURL string) gin.HandlerFunc {
             c.Abort()
             return
         }
-        req.Header.Set("Authorization", token)
+
+        // Добавляем куки в запрос
+        req.AddCookie(&http.Cookie{
+            Name:  "auth_token",
+            Value: token,
+        })
 
         client := &http.Client{}
         resp, err := client.Do(req)

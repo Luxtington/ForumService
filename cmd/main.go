@@ -7,9 +7,11 @@ import (
 	"ForumService/internal/service"
 	"database/sql"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-contrib/cors"
 	_ "github.com/lib/pq"
 	"log"
 	"strconv"
+	"time"
 )
 
 func main() {
@@ -47,13 +49,23 @@ func main() {
 	// Создание экземпляра Gin
 	r := gin.Default()
 
+	// Настройка CORS
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:8082"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
+
 	// Загрузка HTML шаблонов
 	r.LoadHTMLGlob("templates/*")
 	// Настройка статических файлов
 	r.Static("/static", "./static")
 
 	// Инициализация middleware для аутентификации
-	authMiddleware := middleware.AuthServiceMiddleware("http://localhost:8081")
+	authMiddleware := middleware.AuthServiceMiddleware("http://localhost:8082")
 
 	// Группа защищенных маршрутов
 	protected := r.Group("/api")

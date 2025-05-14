@@ -45,11 +45,9 @@
                 <h4 class="mb-0">
                     <i class="bi bi-chat-dots"></i> Комментарии
                 </h4>
-                {{if .User}}
                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#commentModal">
                     <i class="bi bi-plus-circle"></i> Написать комментарий
                 </button>
-                {{end}}
             </div>
             <div class="card-body">
                 <div id="comments-container">
@@ -96,7 +94,8 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form class="comment-form" data-post-id="{{.Post.ID}}">
+                <form class="comment-form">
+                    <input type="hidden" name="post_id" value="{{.post.ID}}">
                     <div class="mb-3">
                         <textarea class="form-control" name="content" rows="4" placeholder="Напишите ваш комментарий..." required></textarea>
                     </div>

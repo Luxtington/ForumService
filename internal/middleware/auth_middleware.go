@@ -4,16 +4,27 @@ import (
     "github.com/gin-gonic/gin"
     "net/http"
     "encoding/json"
+    "strings"
 )
 
 // AuthServiceMiddleware проверяет JWT токен через AuthService
 func AuthServiceMiddleware(authServiceURL string) gin.HandlerFunc {
     return func(c *gin.Context) {
-        token, err := c.Cookie("auth_token")
-        if err != nil {
-            c.JSON(http.StatusUnauthorized, gin.H{"error": "требуется аутентификация"})
-            c.Abort()
-            return
+        // Сначала проверяем заголовок Authorization
+        authHeader := c.GetHeader("Authorization")
+        var token string
+        if authHeader != "" {
+            // Убираем префикс "Bearer " если он есть
+            token = strings.TrimPrefix(authHeader, "Bearer ")
+        } else {
+            // Если нет в заголовке, проверяем куки
+            var err error
+            token, err = c.Cookie("auth_token")
+            if err != nil {
+                c.JSON(http.StatusUnauthorized, gin.H{"error": "требуется аутентификация"})
+                c.Abort()
+                return
+            }
         }
 
         // Проверяем токен через AuthService

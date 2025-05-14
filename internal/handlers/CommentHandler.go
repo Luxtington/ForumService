@@ -6,10 +6,16 @@ import (
 	"net/http"
 	"strconv"
 	"fmt"
+	_ "ForumService/internal/models"
 )
 
 type CommentHandler struct {
 	service service.CommentService
+}
+
+type CreateCommentRequest struct {
+	PostID  string `json:"post_id"`
+	Content string `json:"content"`
 }
 
 func NewCommentHandler(service service.CommentService) *CommentHandler {
@@ -17,29 +23,45 @@ func NewCommentHandler(service service.CommentService) *CommentHandler {
 }
 
 func (h *CommentHandler) CreateComment(c *gin.Context) {
-	var req struct {
-		PostID  int    `json:"post_id" binding:"required"`
-		Content string `json:"content" binding:"required"`
-	}
-
+	var req CreateCommentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		fmt.Printf("Ошибка при разборе JSON: %v\n", err)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Неверный формат данных",
-		})
+		fmt.Printf("Полученные данные: %+v\n", req)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Ошибка при разборе JSON: " + err.Error()})
 		return
 	}
 
-	// Для тестирования устанавливаем author_id = 1
-	comment, err := h.service.CreateComment(req.PostID, 1, req.Content)
+	fmt.Printf("Получен запрос на создание комментария: %+v\n", req)
+
+	// Получаем ID пользователя из контекста
+	userID, exists := c.Get("user_id")
+	if !exists {
+		fmt.Printf("Пользователь не авторизован\n")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "пользователь не авторизован"})
+		return
+	}
+
+	fmt.Printf("ID пользователя: %v\n", userID)
+
+	// Преобразуем post_id из строки в int
+	postID, err := strconv.Atoi(req.PostID)
+	if err != nil {
+		fmt.Printf("Ошибка при преобразовании post_id: %v\n", err)
+		fmt.Printf("Полученный post_id: %v\n", req.PostID)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "неверный формат post_id"})
+		return
+	}
+
+	fmt.Printf("Преобразованный post_id: %v\n", postID)
+
+	comment, err := h.service.CreateComment(postID, userID.(int), req.Content)
 	if err != nil {
 		fmt.Printf("Ошибка при создании комментария: %v\n", err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Ошибка при создании комментария",
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	fmt.Printf("Комментарий успешно создан: %+v\n", comment)
 	c.JSON(http.StatusCreated, comment)
 }
 

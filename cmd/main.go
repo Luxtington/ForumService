@@ -11,6 +11,7 @@ import (
 	_ "github.com/lib/pq"
 	"log"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -67,6 +68,16 @@ func main() {
 	// Инициализация middleware для аутентификации
 	authMiddleware := middleware.AuthServiceMiddleware("http://localhost:8082")
 
+	// Применяем middleware аутентификации ко всем маршрутам
+	r.Use(func(c *gin.Context) {
+		// Проверяем, является ли маршрут защищенным
+		if strings.HasPrefix(c.Request.URL.Path, "/api/") {
+			authMiddleware(c)
+		} else {
+			c.Next()
+		}
+	})
+
 	// Группа защищенных маршрутов
 	protected := r.Group("/api")
 	protected.Use(authMiddleware)
@@ -93,13 +104,19 @@ func main() {
 	// Публичные маршруты
 	// Главная страница со списком тредов
 	r.GET("/", func(c *gin.Context) {
+		user, _ := c.Get("user")
+		userID, _ := c.Get("user_id")
 		c.HTML(200, "index.html", gin.H{
 			"title": "Главная страница",
+			"user": user,
+			"user_id": userID,
 		})
 	})
 
 	// Получение всех тредов (HTML)
 	r.GET("/threads", func(c *gin.Context) {
+		user, _ := c.Get("user")
+		userID, _ := c.Get("user_id")
 		threads, err := threadService.GetAllThreads()
 		if err != nil {
 			c.HTML(500, "error.html", gin.H{
@@ -109,11 +126,15 @@ func main() {
 		}
 		c.HTML(200, "threads.html", gin.H{
 			"threads": threads,
+			"user": user,
+			"user_id": userID,
 		})
 	})
 
 	// Получение конкретного треда с постами (HTML)
 	r.GET("/threads/:id", func(c *gin.Context) {
+		user, _ := c.Get("user")
+		userID, _ := c.Get("user_id")
 		id, err := strconv.Atoi(c.Param("id"))
 		if err != nil {
 			c.HTML(400, "bad_request.html", gin.H{
@@ -131,6 +152,8 @@ func main() {
 		c.HTML(200, "thread.html", gin.H{
 			"thread": thread,
 			"posts":  posts,
+			"user": user,
+			"user_id": userID,
 		})
 	})
 

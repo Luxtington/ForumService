@@ -34,6 +34,9 @@ func RegisterRoutes(router *gin.Engine, services *Services) {
 		// Маршруты для тредов
 		threads := api.Group("/threads")
 		{
+			threads.GET("", threadHandler.GetAllThreads)
+			threads.GET("/:id", threadHandler.GetThreadWithPosts)
+			threads.GET("/:id/posts", threadHandler.GetThreadPosts)
 			threads.POST("", threadHandler.CreateThread)
 			threads.PUT("/:id", threadHandler.UpdateThread)
 			threads.DELETE("/:id", threadHandler.DeleteThread)
@@ -44,6 +47,7 @@ func RegisterRoutes(router *gin.Engine, services *Services) {
 		{
 			posts.GET("", postHandler.GetAllPosts)
 			posts.GET("/:id", postHandler.GetPost)
+			posts.GET("/:id/comments", postHandler.GetPostComments)
 			posts.POST("", postHandler.CreatePost)
 			posts.PUT("/:id", postHandler.UpdatePost)
 			posts.DELETE("/:id", postHandler.DeletePost)

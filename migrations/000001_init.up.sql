@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
     email VARCHAR(100) NOT NULL UNIQUE,
-    password_hash VARCHAR(255) NOT NULL,
+    password VARCHAR(255) NOT NULL,
     role user_role NOT NULL DEFAULT 'user',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -30,7 +30,7 @@ CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at);
 
 -- Создаем тестового пользователя
-INSERT INTO users (username, email, password_hash, role)
+INSERT INTO users (username, email, password, role)
 VALUES ('test_user', 'test@example.com', '$2a$10$abcdefghijklmnopqrstuvwxyz', 'user')
 ON CONFLICT (username) DO NOTHING;
 
@@ -38,7 +38,6 @@ ON CONFLICT (username) DO NOTHING;
 CREATE TABLE IF NOT EXISTS threads (
     id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
-    content TEXT NOT NULL,
     author_id INTEGER NOT NULL REFERENCES users(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

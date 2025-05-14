@@ -33,7 +33,7 @@ func main() {
 	threadRepo := repository.NewThreadRepository(db)
 	postRepo := repository.NewPostRepository(db)
 	commentRepo := repository.NewCommentRepository(db)
-	chatRepo := repository.NewChatMessageRepository(db)
+	chatRepo := repository.NewChatRepository(db)
 
 	// Инициализация сервисов
 	threadService := service.NewThreadService(threadRepo, postRepo)
@@ -198,7 +198,9 @@ func main() {
 	})
 
 	// Запуск сервера
-	if err := r.Run(":8080"); err != nil {
+	port := 8081
+	log.Printf("Server is running on port %d", port)
+	if err := r.Run(":" + strconv.Itoa(port)); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }

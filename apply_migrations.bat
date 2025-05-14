@@ -1,3 +1,4 @@
 @echo off
-migrate -path migrations -database "postgres://postgres:postgres@localhost:5432/forum?sslmode=disable" up
+set PGPASSWORD=postgres
+psql -h localhost -U postgres -d forum -f migrations/000001_init.up.sql
 pause 

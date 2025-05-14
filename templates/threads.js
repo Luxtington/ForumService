@@ -34,7 +34,7 @@ function deleteThread(id) {
         })
         .then(response => {
             if (response.ok) {
-                window.location.reload();
+                loadThreads(); // Перезагружаем список тредов после удаления
             } else {
                 alert('Ошибка при удалении треда');
             }
@@ -112,7 +112,8 @@ document.getElementById('editThreadForm').addEventListener('submit', function(e)
     })
     .then(response => {
         if (response.ok) {
-            window.location.reload();
+            loadThreads(); // Перезагружаем список тредов после редактирования
+            bootstrap.Modal.getInstance(document.getElementById('editThreadModal')).hide();
         } else {
             alert('Ошибка при обновлении треда');
         }
@@ -156,4 +157,30 @@ document.getElementById('createThreadForm').addEventListener('submit', function(
         alert(error.message);
     });
 });
+
+// Функция для загрузки тредов с сервера
+function loadThreads() {
+    fetch('/api/threads')
+        .then(response => response.json())
+        .then(data => {
+            const threadList = document.querySelector('.thread-list');
+            threadList.innerHTML = '';
+            if (data.length === 0) {
+                threadList.innerHTML = `
+                    <div class="text-center text-muted py-5">
+                        <i class="bi bi-chat-square-text display-1"></i>
+                        <p class="mt-3">Пока нет тредов. Создайте первый!</p>
+                    </div>
+                `;
+            } else {
+                data.forEach(thread => addThreadToList(thread));
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка при загрузке тредов:', error);
+        });
+}
+
+// Загружаем треды при загрузке страницы
+document.addEventListener('DOMContentLoaded', loadThreads);
 {{end}} 

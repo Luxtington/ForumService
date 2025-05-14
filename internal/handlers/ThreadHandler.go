@@ -128,3 +128,19 @@ func (h *ThreadHandler) GetAllThreads(c *gin.Context) {
 
 	c.JSON(http.StatusOK, threads)
 }
+
+func (h *ThreadHandler) GetThreadPosts(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid thread ID"})
+		return
+	}
+
+	_, posts, err := h.service.GetThreadWithPosts(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "thread not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, posts)
+}

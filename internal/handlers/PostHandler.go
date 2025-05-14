@@ -276,3 +276,19 @@ func (h *PostHandler) DeleteComment(c *gin.Context) {
 
 	c.Redirect(http.StatusFound, "/posts/"+strconv.Itoa(postID))
 }
+
+func (h *PostHandler) GetPostComments(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid post ID"})
+		return
+	}
+
+	_, comments, err := h.service.GetPostWithComments(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "post not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, comments)
+}

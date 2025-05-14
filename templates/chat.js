@@ -96,6 +96,33 @@ function scrollChatToBottom() {
     }
 }
 
-// Прокручиваем чат вниз при загрузке страницы
-document.addEventListener('DOMContentLoaded', scrollChatToBottom);
+// Функция для загрузки сообщений чата
+function loadChatMessages() {
+    fetch('/api/chat')
+        .then(response => response.json())
+        .then(data => {
+            const chatMessages = document.getElementById('chatMessages');
+            chatMessages.innerHTML = '';
+            if (data.length === 0) {
+                chatMessages.innerHTML = `
+                    <div class="text-center text-muted py-5">
+                        <i class="bi bi-chat-square-text display-1"></i>
+                        <p class="mt-3">Чат пуст. Напишите первое сообщение!</p>
+                    </div>
+                `;
+            } else {
+                data.forEach(message => addMessageToChat(message));
+            }
+            scrollChatToBottom();
+        })
+        .catch(error => {
+            console.error('Ошибка при загрузке сообщений чата:', error);
+        });
+}
+
+// Загружаем сообщения при загрузке страницы
+document.addEventListener('DOMContentLoaded', () => {
+    loadChatMessages();
+    scrollChatToBottom();
+});
 {{end}} 

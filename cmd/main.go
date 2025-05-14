@@ -134,6 +134,46 @@ func main() {
 		})
 	})
 
+	// Получение конкретного поста (HTML)
+	r.GET("/posts/:id", func(c *gin.Context) {
+		id, err := strconv.Atoi(c.Param("id"))
+		if err != nil {
+			c.HTML(400, "error.html", gin.H{
+				"error": "Неверный ID поста",
+			})
+			return
+		}
+		post, comments, err := postService.GetPostWithComments(id)
+		if err != nil {
+			c.HTML(404, "error.html", gin.H{
+				"error": "Пост не найден",
+			})
+			return
+		}
+
+		// Получаем информацию о пользователе из контекста
+		user, _ := c.Get("user")
+		userID, _ := c.Get("user_id")
+
+		// Проверяем, может ли пользователь редактировать пост
+		canEdit := false
+		if userID != nil && post.AuthorID == userID.(int) {
+			canEdit = true
+		}
+
+		// Добавляем флаг CanDelete для комментариев
+		for i := range comments {
+			comments[i].CanDelete = userID != nil && comments[i].AuthorID == userID.(int)
+		}
+
+		c.HTML(200, "view_post.html", gin.H{
+			"post":     post,
+			"comments": comments,
+			"user":     user,
+			"CanEdit":  canEdit,
+		})
+	})
+
 	// Запуск сервера
 	if err := r.Run(":8080"); err != nil {
 		log.Fatalf("Failed to start server: %v", err)

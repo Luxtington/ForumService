@@ -43,7 +43,8 @@ type Comment struct {
 	AuthorID  int       `json:"author_id"`
 	Content   string    `json:"content"`
 	CreatedAt time.Time `json:"created_at"`
-	//UpdatedAt time.Time `json:"updated_at"`
+	CanDelete bool      `json:"can_delete"`
+	AuthorName string   `json:"author_name"`
 }
 
 //	type CreateThreadRequest struct {

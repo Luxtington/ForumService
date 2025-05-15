@@ -126,6 +126,14 @@ func (h *ThreadHandler) GetAllThreads(c *gin.Context) {
 		return
 	}
 
+	// Добавляем информацию об авторе для каждого треда
+	for _, thread := range threads {
+		user, err := h.service.GetUserByID(thread.AuthorID)
+		if err == nil && user != nil {
+			thread.AuthorName = user.Username
+		}
+	}
+
 	c.JSON(http.StatusOK, threads)
 }
 
@@ -136,7 +144,7 @@ func (h *ThreadHandler) GetThreadPosts(c *gin.Context) {
 		return
 	}
 
-	_, posts, err := h.service.GetThreadWithPosts(id)
+	posts, err := h.service.GetPostsByThreadID(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "thread not found"})
 		return

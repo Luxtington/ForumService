@@ -30,13 +30,18 @@ func main() {
 	}
 
 	// Инициализация репозиториев
-	threadRepo := repository.NewThreadRepository(db)
+	//threadRepo := repository.NewThreadRepository(db)
 	postRepo := repository.NewPostRepository(db)
 	commentRepo := repository.NewCommentRepository(db)
 	chatRepo := repository.NewChatRepository(db)
+    //userRepo := repository.NewUserRepository(db)
 
 	// Инициализация сервисов
-	threadService := service.NewThreadService(threadRepo, postRepo)
+	threadService := service.NewThreadService(
+		repository.NewThreadRepository(db),
+		repository.NewPostRepository(db),
+		repository.NewUserRepository(db),
+	)
 	postService := service.NewPostService(postRepo, commentRepo)
 	commentService := service.NewCommentService(commentRepo)
 	chatService := service.NewChatService(chatRepo)
@@ -86,6 +91,8 @@ func main() {
 		protected.POST("/threads", threadHandler.CreateThread)
 		protected.PUT("/threads/:id", threadHandler.UpdateThread)
 		protected.DELETE("/threads/:id", threadHandler.DeleteThread)
+		protected.GET("/threads/:id/posts", threadHandler.GetThreadPosts)
+		protected.GET("/threads", threadHandler.GetAllThreads)
 
 		// Маршруты для постов
 		protected.POST("/posts", postHandler.CreatePost)

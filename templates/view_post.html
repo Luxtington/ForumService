@@ -64,13 +64,6 @@
                                 </small>
                             </div>
                             <p class="card-text mb-0">{{.Content}}</p>
-                            {{if .CanDelete}}
-                            <div class="mt-2">
-                                <button class="btn btn-outline-danger btn-sm delete-comment" data-comment-id="{{.ID}}" onclick="return confirm('Вы уверены, что хотите удалить этот комментарий?')">
-                                    <i class="bi bi-trash"></i> Удалить
-                                </button>
-                            </div>
-                            {{end}}
                         </div>
                     </div>
                     {{else}}
@@ -110,4 +103,67 @@
         </div>
     </div>
 </div>
+
+<script>
+    // Обработчик формы создания комментария
+    document.getElementById('commentForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const content = this.querySelector('textarea[name="content"]').value;
+        const postId = {{.Post.ID}};
+        
+        fetch('/api/comments', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+                post_id: String(postId),
+                content: content
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Ошибка при создании комментария');
+            }
+            return response.json();
+        })
+        .then(comment => {
+            // Очищаем форму
+            this.querySelector('textarea[name="content"]').value = '';
+            
+            // Удаляем сообщение "нет комментариев", если оно есть
+            const noComments = document.querySelector('.text-center.text-muted');
+            if (noComments) {
+                noComments.remove();
+            }
+
+            // Создаем новый элемент комментария
+            const commentElement = document.createElement('div');
+            commentElement.className = 'card mb-3 fade-in';
+            commentElement.innerHTML = `
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-person-circle me-2"></i>
+                            <strong>${comment.author_name}</strong>
+                        </div>
+                        <small class="text-muted">
+                            <i class="bi bi-clock"></i> ${new Date(comment.created_at).toLocaleString()}
+                        </small>
+                    </div>
+                    <p class="card-text mb-0">${comment.content}</p>
+                </div>
+            `;
+
+            // Добавляем комментарий в начало списка
+            const commentsContainer = document.getElementById('comments-container');
+            commentsContainer.insertBefore(commentElement, commentsContainer.firstChild);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert(error.message);
+        });
+    });
+</script>
 {{end}} 

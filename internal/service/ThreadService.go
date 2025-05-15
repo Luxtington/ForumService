@@ -13,17 +13,21 @@ type ThreadService interface {
 	UpdateThread(thread *models.Thread) error
 	DeleteThread(threadID int) error
 	GetAllThreads() ([]*models.Thread, error)
+	GetPostsByThreadID(threadID int) ([]*models.Post, error)
+	GetUserByID(userID int) (*models.User, error)
 }
 
 type threadService struct {
 	threadRepo repository.ThreadRepository
 	postRepo   repository.PostRepository
+	userRepo   repository.UserRepository
 }
 
-func NewThreadService(threadRepo repository.ThreadRepository, postRepo repository.PostRepository) ThreadService {
+func NewThreadService(threadRepo repository.ThreadRepository, postRepo repository.PostRepository, userRepo repository.UserRepository) ThreadService {
 	return &threadService{
 		threadRepo: threadRepo,
 		postRepo:   postRepo,
+		userRepo:   userRepo,
 	}
 }
 
@@ -77,4 +81,12 @@ func (s *threadService) GetAllThreads() ([]*models.Thread, error) {
 		return nil, fmt.Errorf("ошибка при получении тредов: %v", err)
 	}
 	return threads, nil
+}
+
+func (s *threadService) GetPostsByThreadID(threadID int) ([]*models.Post, error) {
+	return s.postRepo.GetByThreadID(threadID)
+}
+
+func (s *threadService) GetUserByID(userID int) (*models.User, error) {
+	return s.userRepo.GetUserByID(userID)
 }

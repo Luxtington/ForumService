@@ -14,10 +14,89 @@
             font-size: 24px;
             margin-bottom: 20px;
             color: #333;
-            padding: 10px;
+            padding: 15px;
             background-color: white;
-            border-radius: 5px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .post-card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-bottom: 20px;
+            border: 1px solid #e0e0e0;
+            cursor: pointer;
+        }
+        .post-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        .post-card .card-body {
+            padding: 20px;
+        }
+        .post-card .card-title {
+            color: #2c3e50;
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .post-card .card-text {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        .post-card .post-content {
+            color: #333;
+            font-size: 1rem;
+            line-height: 1.6;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .btn-group {
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+        .post-card:hover .btn-group {
+            opacity: 1;
+        }
+        .btn-outline-primary, .btn-outline-danger {
+            padding: 6px 12px;
+            font-size: 0.875rem;
+            border-radius: 4px;
+            margin-left: 5px;
+        }
+        .btn-outline-primary {
+            color: #007bff;
+            border-color: #007bff;
+        }
+        .btn-outline-primary:hover {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-outline-danger {
+            color: #dc3545;
+            border-color: #dc3545;
+        }
+        .btn-outline-danger:hover {
+            background-color: #dc3545;
+            color: white;
+        }
+        .add-post-btn {
+            margin-bottom: 20px;
+            padding: 10px 20px;
+            font-size: 1rem;
+            border-radius: 6px;
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            border: none;
+            color: white;
+            transition: transform 0.2s;
+        }
+        .add-post-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
         .post {
             background-color: white;
@@ -26,11 +105,6 @@
             margin-bottom: 15px;
             border-radius: 5px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        .post-content {
-            margin-top: 10px;
-            line-height: 1.5;
-            color: #333;
         }
         .post-meta {
             color: #666;
@@ -42,13 +116,21 @@
             align-items: center;
         }
         .no-posts {
-            color: #666;
-            font-style: italic;
             text-align: center;
-            padding: 20px;
+            padding: 40px 20px;
             background-color: white;
-            border-radius: 5px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .no-posts i {
+            font-size: 3rem;
+            color: #6c757d;
+            margin-bottom: 15px;
+        }
+        .no-posts p {
+            color: #6c757d;
+            font-size: 1.1rem;
+            margin: 0;
         }
         .btn {
             padding: 8px 15px;
@@ -81,10 +163,30 @@
         }
         .post-actions {
             display: flex;
-            gap: 10px;
+            gap: 8px;
+            margin-right: 15px;
+            opacity: 0.7;
+            transition: opacity 0.2s;
         }
-        .add-post-btn {
-            margin-bottom: 20px;
+        .post-card:hover .post-actions {
+            opacity: 1;
+        }
+        .post-actions .btn {
+            padding: 4px 8px;
+            font-size: 0.875rem;
+            border-radius: 4px;
+        }
+        .post-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .post-title {
+            margin: 0;
+            flex-grow: 1;
+            color: #2c3e50;
+            font-size: 1.25rem;
+            font-weight: 600;
         }
         .modal {
             display: none;
@@ -131,6 +233,10 @@
             text-align: right;
             margin-top: 15px;
         }
+        .post-content {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
     </style>
 </head>
 <body>
@@ -139,28 +245,10 @@
     <button class="btn btn-primary add-post-btn" onclick="showCreatePostModal()">Добавить пост</button>
     
     <div class="thread-posts">
-        {{if .Posts}}
-            {{range .Posts}}
-            <div class="post">
-                <div class="post-meta">
-                    <a href="/posts/{{.id}}" style="text-decoration: none; color: inherit;">
-                        Пост #{{.id}} • {{.created_at.Format "02.01.2006 15:04"}}
-                    </a>
-                    <div class="post-actions">
-                        <button class="btn btn-edit" onclick="showEditPostModal({{.id}}, '{{.content}}')">Редактировать</button>
-                        <button class="btn btn-delete" onclick="deletePost({{.id}})">Удалить</button>
-                    </div>
-                </div>
-                <div class="post-content">
-                    {{.content}}
-                </div>
-            </div>
-            {{end}}
-        {{else}}
-            <div class="no-posts">
-                В этом треде пока нет постов
-            </div>
-        {{end}}
+        <div class="text-center text-muted py-5">
+            <i class="bi bi-chat-square-text display-1"></i>
+            <p class="mt-3">Загрузка постов...</p>
+        </div>
     </div>
 
     <!-- Модальное окно создания поста -->
@@ -224,13 +312,76 @@
             document.getElementById('editPostModal').style.display = 'none';
         }
 
+        // Загружаем посты при загрузке страницы
+        document.addEventListener('DOMContentLoaded', () => {
+            loadThreadPosts();
+        });
+
+        // Функция для загрузки постов
+        function loadThreadPosts() {
+            const threadId = window.location.pathname.split('/')[2];
+            fetch(`/api/threads/${threadId}/posts`)
+                .then(response => response.json())
+                .then(data => {
+                    const postsContainer = document.querySelector('.thread-posts');
+                    postsContainer.innerHTML = '';
+                    if (!data || data.length === 0) {
+                        postsContainer.innerHTML = `
+                            <div class="no-posts">
+                                <i class="bi bi-chat-square-text"></i>
+                                <p>Постов еще нет. Напишите первый!</p>
+                            </div>
+                        `;
+                    } else {
+                        data.forEach(post => {
+                            const postElement = document.createElement('div');
+                            postElement.className = 'post-card';
+                            postElement.innerHTML = `
+                                <div class="card-body">
+                                    <div class="post-header">
+                                        <div class="post-actions">
+                                            <button class="btn btn-outline-primary" onclick="event.stopPropagation(); showEditPostModal(${post.id}, '${post.content.replace(/'/g, "\\'")}')">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button class="btn btn-outline-danger" onclick="event.stopPropagation(); deletePost(${post.id})">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                        <h5 class="post-title">${post.title || 'Новый пост'}</h5>
+                                    </div>
+                                    <p class="card-text">
+                                        <i class="bi bi-person-circle"></i> ${post.author_name || 'Аноним'} • 
+                                        <i class="bi bi-clock"></i> ${new Date(post.created_at).toLocaleString('ru-RU')}
+                                    </p>
+                                    <div class="post-content">
+                                        ${post.content}
+                                    </div>
+                                </div>
+                            `;
+                            postElement.addEventListener('click', () => {
+                                window.location.href = `/posts/${post.id}`;
+                            });
+                            postsContainer.appendChild(postElement);
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка при загрузке постов:', error);
+                    const postsContainer = document.querySelector('.thread-posts');
+                    postsContainer.innerHTML = `
+                        <div class="no-posts">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <p>Ошибка при загрузке постов</p>
+                        </div>
+                    `;
+                });
+        }
+
         // Обработчик формы создания поста
         document.getElementById('createPostForm').addEventListener('submit', function(e) {
             e.preventDefault();
             const content = document.getElementById('postContent').value;
-            const threadId = window.location.pathname.split('/').pop(); // Получаем ID треда из URL
-            
-            console.log('Отправка запроса на создание поста:', { thread_id: threadId, content: content });
+            const threadId = window.location.pathname.split('/')[2];
             
             fetch('/api/posts', {
                 method: 'POST',
@@ -243,40 +394,12 @@
                 })
             })
             .then(response => {
-                console.log('Получен ответ:', response.status);
                 if (response.ok) {
-                    return response.json();
-                } else {
-                    throw new Error('Ошибка при создании поста');
-                }
-            })
-            .then(post => {
-                console.log('Получен пост:', post);
-                // Добавляем новый пост на страницу без перезагрузки
-                const postsContainer = document.querySelector('.thread-posts');
-                if (postsContainer) {
-                    const postElement = document.createElement('div');
-                    postElement.className = 'post';
-                    postElement.innerHTML = `
-                        <div class="post-meta">
-                            <a href="/posts/${post.id}" style="text-decoration: none; color: inherit;">
-                                Пост #${post.id} • ${new Date(post.created_at).toLocaleString()}
-                            </a>
-                            <div class="post-actions">
-                                <button class="btn btn-edit" onclick="showEditPostModal(${post.id}, '${post.content}')">Редактировать</button>
-                                <button class="btn btn-delete" onclick="deletePost(${post.id})">Удалить</button>
-                            </div>
-                        </div>
-                        <div class="post-content">
-                            ${post.content}
-                        </div>
-                    `;
-                    postsContainer.insertBefore(postElement, postsContainer.firstChild);
                     document.getElementById('postContent').value = '';
                     hideCreatePostModal();
+                    loadThreadPosts(); // Перезагружаем посты после создания
                 } else {
-                    console.error('Не найден контейнер для постов');
-                    window.location.reload();
+                    throw new Error('Ошибка при создании поста');
                 }
             })
             .catch(error => {
@@ -302,14 +425,15 @@
             })
             .then(response => {
                 if (response.ok) {
-                    window.location.reload();
+                    hideEditPostModal();
+                    loadThreadPosts(); // Перезагружаем посты после редактирования
                 } else {
-                    alert('Ошибка при обновлении поста');
+                    throw new Error('Ошибка при обновлении поста');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Ошибка при обновлении поста');
+                alert(error.message);
             });
         });
 
@@ -321,113 +445,17 @@
                 })
                 .then(response => {
                     if (response.ok) {
-                        window.location.reload();
+                        loadThreadPosts(); // Перезагружаем посты после удаления
                     } else {
-                        alert('Ошибка при удалении поста');
+                        throw new Error('Ошибка при удалении поста');
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    alert('Ошибка при удалении поста');
+                    alert(error.message);
                 });
             }
         }
-
-        // Функция для загрузки постов треда
-        function loadThreadPosts(threadId) {
-            fetch(`/api/threads/${threadId}/posts`)
-                .then(response => response.json())
-                .then(data => {
-                    const postsContainer = document.querySelector('.thread-posts');
-                    postsContainer.innerHTML = '';
-                    if (data.length === 0) {
-                        postsContainer.innerHTML = `
-                            <div class="no-posts">
-                                В этом треде пока нет постов
-                            </div>
-                        `;
-                    } else {
-                        data.forEach(post => {
-                            const postElement = document.createElement('div');
-                            postElement.className = 'post';
-                            postElement.innerHTML = `
-                                <div class="post-meta">
-                                    <a href="/posts/${post.id}" style="text-decoration: none; color: inherit;">
-                                        Пост #${post.id} • ${new Date(post.created_at).toLocaleString()}
-                                    </a>
-                                    <div class="post-actions">
-                                        <button class="btn btn-edit" onclick="showEditPostModal(${post.id}, '${post.content}')">Редактировать</button>
-                                        <button class="btn btn-delete" onclick="deletePost(${post.id})">Удалить</button>
-                                    </div>
-                                </div>
-                                <div class="post-content">
-                                    ${post.content}
-                                </div>
-                            `;
-                            postsContainer.appendChild(postElement);
-                        });
-                    }
-                })
-                .catch(error => {
-                    console.error('Ошибка при загрузке постов:', error);
-                });
-        }
-
-        // Функция для загрузки комментариев поста
-        function loadPostComments(postId) {
-            fetch(`/api/posts/${postId}/comments`)
-                .then(response => response.json())
-                .then(data => {
-                    const commentsContainer = document.getElementById(`comments-${postId}`);
-                    if (!commentsContainer) return;
-                    
-                    commentsContainer.innerHTML = '';
-                    if (data.length === 0) {
-                        commentsContainer.innerHTML = `
-                            <div class="text-center text-muted">
-                                <i class="bi bi-chat-square-text display-4"></i>
-                                <p class="mt-3">Пока нет комментариев. Будьте первым!</p>
-                            </div>
-                        `;
-                    } else {
-                        data.forEach(comment => {
-                            const commentElement = document.createElement('div');
-                            commentElement.className = 'card mb-3 fade-in';
-                            commentElement.innerHTML = `
-                                <div class="card-body">
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <div class="d-flex align-items-center">
-                                            <i class="bi bi-person-circle me-2"></i>
-                                            <strong>${comment.author_name}</strong>
-                                        </div>
-                                        <small class="text-muted">
-                                            <i class="bi bi-clock"></i> ${new Date(comment.created_at).toLocaleString()}
-                                        </small>
-                                    </div>
-                                    <p class="card-text mb-0">${comment.content}</p>
-                                    <div class="mt-2">
-                                        <button class="btn btn-outline-danger btn-sm delete-comment" data-comment-id="${comment.id}" onclick="return confirm('Вы уверены, что хотите удалить этот комментарий?')">
-                                            <i class="bi bi-trash"></i> Удалить
-                                        </button>
-                                    </div>
-                                </div>
-                            `;
-                            commentsContainer.appendChild(commentElement);
-                        });
-                    }
-                })
-                .catch(error => {
-                    console.error('Ошибка при загрузке комментариев:', error);
-                });
-        }
-
-        // Загружаем посты при загрузке страницы
-        document.addEventListener('DOMContentLoaded', () => {
-            const threadId = window.location.pathname.split('/')[2];
-            if (threadId) {
-                loadThreadPosts(threadId);
-            }
-        });
     </script>
 </body>
 </html>

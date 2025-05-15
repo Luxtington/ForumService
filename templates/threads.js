@@ -1,4 +1,3 @@
-{{define "threads.js"}}
 // Функция для форматирования даты
 function formatDate(dateString) {
     console.log('Форматирование даты:', dateString);
@@ -160,12 +159,24 @@ document.getElementById('createThreadForm').addEventListener('submit', function(
 
 // Функция для загрузки тредов с сервера
 function loadThreads() {
+    console.log('Загрузка тредов...');
     fetch('/api/threads')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Ошибка при загрузке тредов');
+            }
+            return response.json();
+        })
         .then(data => {
+            console.log('Получены треды:', data);
             const threadList = document.querySelector('.thread-list');
+            if (!threadList) {
+                console.error('Элемент .thread-list не найден');
+                return;
+            }
+            
             threadList.innerHTML = '';
-            if (data.length === 0) {
+            if (!data || data.length === 0) {
                 threadList.innerHTML = `
                     <div class="text-center text-muted py-5">
                         <i class="bi bi-chat-square-text display-1"></i>
@@ -178,9 +189,23 @@ function loadThreads() {
         })
         .catch(error => {
             console.error('Ошибка при загрузке тредов:', error);
+            const threadList = document.querySelector('.thread-list');
+            if (threadList) {
+                threadList.innerHTML = `
+                    <div class="text-center text-danger py-5">
+                        <i class="bi bi-exclamation-triangle display-1"></i>
+                        <p class="mt-3">Ошибка при загрузке тредов. Попробуйте обновить страницу.</p>
+                    </div>
+                `;
+            }
         });
 }
 
-// Загружаем треды при загрузке страницы
-document.addEventListener('DOMContentLoaded', loadThreads);
-{{end}} 
+// Функция для периодической подгрузки тредов
+function startThreadsPolling() {
+    loadThreads(); // Загружаем треды сразу
+    setInterval(loadThreads, 5000); // Обновляем каждые 5 секунд
+}
+
+// Запускаем подгрузку тредов при загрузке страницы
+document.addEventListener('DOMContentLoaded', startThreadsPolling); 

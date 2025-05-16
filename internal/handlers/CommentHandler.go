@@ -60,17 +60,27 @@ func (h *CommentHandler) DeleteComment(c *gin.Context) {
 	}
 
 	// Получаем userID и isAdmin из контекста с проверкой на nil
-	userID, _ := c.Get("user_id")
-	isAdmin, _ := c.Get("is_admin")
-
-	// Устанавливаем значения по умолчанию, если они nil
-	var userIDInt int
-	if userID == nil {
-		userIDInt = 1 // Для тестирования используем ID 1
-	} else {
-		userIDInt = userID.(int)
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(401, gin.H{"error": "пользователь не аутентифицирован"})
+		return
 	}
 
+	// Безопасное преобразование типов
+	var userIDInt int
+	switch v := userID.(type) {
+	case uint:
+		userIDInt = int(v)
+	case float64:
+		userIDInt = int(v)
+	case int:
+		userIDInt = v
+	default:
+		c.JSON(500, gin.H{"error": "неверный тип user_id"})
+		return
+	}
+
+	isAdmin, _ := c.Get("is_admin")
 	var isAdminBool bool
 	if isAdmin == nil {
 		isAdminBool = false

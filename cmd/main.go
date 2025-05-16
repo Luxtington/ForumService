@@ -221,14 +221,19 @@ func main() {
 		log.Printf("Debug - User info: user=%+v, userID=%+v", user, userID)
 
 		// Проверяем, может ли пользователь редактировать пост
-		canEdit := false
-		if userID != nil && post.AuthorID == userID.(int) {
-			canEdit = true
+		if userID != nil {
+			userIDInt := int(userID.(uint))
+			if post.AuthorID == userIDInt {
+				post.CanEdit = true
+			}
 		}
 
 		// Добавляем флаг CanDelete для комментариев
 		for i := range comments {
-			comments[i].CanDelete = userID != nil && comments[i].AuthorID == userID.(int)
+			if userID != nil {
+				userIDInt := int(userID.(uint))
+				comments[i].CanDelete = comments[i].AuthorID == userIDInt
+			}
 		}
 
 		log.Printf("Отправка данных в шаблон: post=%+v, comments=%+v, user=%+v, userID=%+v", post, comments, user, userID)
@@ -238,7 +243,7 @@ func main() {
 			"comments": comments,
 			"user":     user,
 			"user_id":  userID,
-			"CanEdit":  canEdit,
+			"CanEdit":  post.CanEdit,
 		})
 	})
 

@@ -168,104 +168,102 @@
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Проверяем наличие токена в куки
-            const getToken = () => {
-                const cookies = document.cookie.split(';');
-                for (let cookie of cookies) {
-                    const [name, value] = cookie.trim().split('=');
-                    if (name === 'auth_token') {
-                        return value;
-                    }
+        // Обработчик формы создания комментария
+        document.getElementById('commentForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const content = this.querySelector('textarea[name="content"]').value;
+            const postId = {{.post.ID}};
+            
+            fetch('/api/comments', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    post_id: postId,
+                    content: content
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Ошибка при создании комментария');
                 }
-                return null;
-            };
+                return response.json();
+            })
+            .then(comment => {
+                // Очищаем форму
+                this.querySelector('textarea[name="content"]').value = '';
+                
+                // Добавляем новый комментарий в начало списка
+                const commentsContainer = document.getElementById('comments-container');
+                const noComments = commentsContainer.querySelector('.text-center.text-muted');
+                if (noComments) {
+                    noComments.remove();
+                }
+                
+                const commentElement = document.createElement('div');
+                commentElement.className = 'comment fade-in';
+                commentElement.innerHTML = `
+                    <div class="comment-meta">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-person-circle me-2"></i>
+                            <strong>${comment.author_name}</strong>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <small class="text-muted me-3">
+                                <i class="bi bi-clock"></i> ${new Date(comment.created_at).toLocaleString()}
+                            </small>
+                            <button class="btn btn-sm btn-danger delete-comment" data-comment-id="${comment.id}">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="comment-content">
+                        ${comment.content}
+                    </div>
+                `;
+                
+                commentsContainer.insertBefore(commentElement, commentsContainer.firstChild);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert(error.message);
+            });
+        });
 
-            const token = getToken();
-            if (token) {
-                // Если токен есть, проверяем его валидность
-                fetch('/api/auth/validate', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
+        // Обработчик удаления комментариев
+        document.querySelectorAll('.delete-comment').forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (!confirm('Вы уверены, что хотите удалить этот комментарий?')) {
+                    return;
+                }
+
+                const commentId = this.dataset.commentId;
+                fetch(`/api/comments/${commentId}`, {
+                    method: 'DELETE'
                 })
                 .then(response => {
                     if (!response.ok) {
-                        // Если токен невалиден, перезагружаем страницу
-                        window.location.reload();
+                        throw new Error('Ошибка при удалении комментария');
+                    }
+                    // Удаляем элемент комментария из DOM
+                    this.closest('.comment').remove();
+                    
+                    // Если больше нет комментариев, показываем сообщение
+                    const commentsContainer = document.getElementById('comments-container');
+                    if (!commentsContainer.querySelector('.comment')) {
+                        commentsContainer.innerHTML = `
+                            <div class="text-center text-muted">
+                                <i class="bi bi-chat-square-text display-4"></i>
+                                <p class="mt-3">Пока нет комментариев. Будьте первым!</p>
+                            </div>
+                        `;
                     }
                 })
-                .catch(() => {
-                    window.location.reload();
-                });
-            }
-
-            const commentForm = document.getElementById('commentForm');
-            if (commentForm) {
-                commentForm.addEventListener('submit', function(e) {
-                    e.preventDefault();
-                    
-                    const token = getToken();
-                    if (!token) {
-                        alert('Пожалуйста, войдите в систему');
-                        return;
-                    }
-
-                    const content = this.querySelector('textarea[name="content"]').value;
-                    const postId = this.dataset.postId;
-
-                    fetch('/api/comments', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`
-                        },
-                        body: JSON.stringify({
-                            post_id: postId,
-                            content: content
-                        })
-                    })
-                    .then(response => {
-                        if (response.ok) {
-                            window.location.reload();
-                        } else {
-                            alert('Ошибка при создании комментария');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        alert('Ошибка при создании комментария');
-                    });
-                });
-            }
-
-            // Обработчики удаления комментариев
-            document.querySelectorAll('.delete-comment').forEach(button => {
-                button.addEventListener('click', function() {
-                    if (!confirm('Вы уверены, что хотите удалить этот комментарий?')) {
-                        return;
-                    }
-
-                    const commentId = this.dataset.commentId;
-                    const token = getToken();
-                    
-                    fetch(`/api/comments/${commentId}`, {
-                        method: 'DELETE',
-                        headers: {
-                            'Authorization': `Bearer ${token}`
-                        }
-                    })
-                    .then(response => {
-                        if (response.ok) {
-                            window.location.reload();
-                        } else {
-                            alert('Ошибка при удалении комментария');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        alert('Ошибка при удалении комментария');
-                    });
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert(error.message);
                 });
             });
         });

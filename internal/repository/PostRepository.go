@@ -117,32 +117,42 @@ func (r *postRepository) GetPostByID(id int) (*models.Post, error) {
 func (r *postRepository) GetPostWithComments(postID int) (*models.Post, []models.Comment, error) {
 	post, err := r.GetPostByID(postID)
 	if err != nil {
-		log.Println("ERROR IN POST REPO 4")
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("ошибка при получении поста: %w", err)
 	}
 
-	const query = `SELECT id, post_id, author_id, content, created_at
-                   FROM comments
-                   WHERE post_id = $1
-                   ORDER BY created_at ASC`
+	const query = `SELECT c.id, c.post_id, c.author_id, c.content, c.created_at, u.username as author_name
+                   FROM comments c
+                   LEFT JOIN users u ON c.author_id = u.id
+                   WHERE c.post_id = $1
+                   ORDER BY c.created_at ASC`
 
 	rows, err := r.db.Query(query, postID)
 	if err != nil {
-		log.Println("ERROR IN POST REPO 5")
-		return post, make([]models.Comment, 0), nil
+		return nil, nil, fmt.Errorf("ошибка при получении комментариев: %w", err)
 	}
 	defer rows.Close()
 
 	comments := make([]models.Comment, 0)
 	for rows.Next() {
 		var comment models.Comment
-		err := rows.Scan(&comment.ID, &comment.PostID, &comment.AuthorID, &comment.Content, &comment.CreatedAt)
+		err := rows.Scan(
+			&comment.ID,
+			&comment.PostID,
+			&comment.AuthorID,
+			&comment.Content,
+			&comment.CreatedAt,
+			&comment.AuthorName,
+		)
 		if err != nil {
-			log.Println("ERROR IN POST REPO 5.1")
-			return post, comments, nil
+			return nil, nil, fmt.Errorf("ошибка при сканировании комментария: %w", err)
 		}
 		comments = append(comments, comment)
 	}
+
+	if err = rows.Err(); err != nil {
+		return nil, nil, fmt.Errorf("ошибка при итерации комментариев: %w", err)
+	}
+
 	return post, comments, nil
 }
 

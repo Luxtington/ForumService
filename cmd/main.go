@@ -173,8 +173,10 @@ func main() {
 			})
 			return
 		}
+
 		post, comments, err := postService.GetPostWithComments(id)
 		if err != nil {
+			log.Printf("Ошибка при получении поста с комментариями: %v", err)
 			c.HTML(404, "error.html", gin.H{
 				"error": "Пост не найден",
 			})
@@ -196,7 +198,9 @@ func main() {
 			comments[i].CanDelete = userID != nil && comments[i].AuthorID == userID.(int)
 		}
 
-		c.HTML(200, "view_post.html", gin.H{
+		log.Printf("Отправка данных в шаблон: post=%+v, comments=%+v", post, comments)
+
+		c.HTML(200, "post.html", gin.H{
 			"post":     post,
 			"comments": comments,
 			"user":     user,

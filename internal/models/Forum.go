@@ -38,13 +38,13 @@ type Post struct {
 }
 
 type Comment struct {
-	ID        int       `json:"id"`
-	PostID    int       `json:"post_id"`
-	AuthorID  int       `json:"author_id"`
-	Content   string    `json:"content"`
-	CreatedAt time.Time `json:"created_at"`
-	CanDelete bool      `json:"can_delete"`
-	AuthorName string   `json:"author_name"`
+	ID         int       `json:"id"`
+	PostID     int       `json:"post_id"`
+	AuthorID   int       `json:"author_id"`
+	Content    string    `json:"content"`
+	CreatedAt  time.Time `json:"created_at"`
+	CanDelete  bool      `json:"can_delete"`
+	AuthorName string    `json:"author_name"`
 }
 
 //	type CreateThreadRequest struct {

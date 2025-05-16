@@ -339,14 +339,6 @@
                             postElement.innerHTML = `
                                 <div class="card-body">
                                     <div class="post-header">
-                                        <div class="post-actions">
-                                            <button class="btn btn-outline-primary" onclick="event.stopPropagation(); showEditPostModal(${post.id}, '${post.content.replace(/'/g, "\\'")}')">
-                                                <i class="bi bi-pencil"></i>
-                                            </button>
-                                            <button class="btn btn-outline-danger" onclick="event.stopPropagation(); deletePost(${post.id})">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </div>
                                         <h5 class="post-title">${post.title || 'Новый пост'}</h5>
                                     </div>
                                     <p class="card-text">

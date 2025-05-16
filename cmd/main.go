@@ -11,7 +11,7 @@ import (
 	_ "github.com/lib/pq"
 	"log"
 	"strconv"
-	"strings"
+	_"strings"
 	"time"
 )
 
@@ -59,8 +59,8 @@ func main() {
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:8082"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Cookie", "X-Requested-With"},
+		ExposeHeaders:    []string{"Content-Length", "Set-Cookie"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
@@ -73,40 +73,71 @@ func main() {
 	// Инициализация middleware для аутентификации
 	authMiddleware := middleware.AuthServiceMiddleware("http://localhost:8082")
 
-	// Применяем middleware аутентификации ко всем маршрутам
-	r.Use(func(c *gin.Context) {
-		// Проверяем, является ли маршрут защищенным
-		if strings.HasPrefix(c.Request.URL.Path, "/api/") {
-			authMiddleware(c)
-		} else {
-			c.Next()
-		}
-	})
-
 	// Группа защищенных маршрутов
 	protected := r.Group("/api")
-	protected.Use(authMiddleware)
-	{
-		// Маршруты для тредов
-		protected.POST("/threads", threadHandler.CreateThread)
-		protected.PUT("/threads/:id", threadHandler.UpdateThread)
-		protected.DELETE("/threads/:id", threadHandler.DeleteThread)
-		protected.GET("/threads/:id/posts", threadHandler.GetThreadPosts)
-		protected.GET("/threads", threadHandler.GetAllThreads)
+	protected.Use(func(c *gin.Context) {
+		// Проверяем токен в заголовке Authorization
+		authHeader := c.GetHeader("Authorization")
+		if authHeader != "" {
+			authMiddleware(c)
+			return
+		}
 
-		// Маршруты для постов
-		protected.POST("/posts", postHandler.CreatePost)
-		protected.PUT("/posts/:id", postHandler.UpdatePost)
-		protected.DELETE("/posts/:id", postHandler.DeletePost)
+		// Проверяем токен в куках
+		token, err := c.Cookie("auth_token")
+		if err == nil && token != "" {
+			// Если токен есть в куках, добавляем его в заголовок
+			c.Request.Header.Set("Authorization", "Bearer "+token)
+			authMiddleware(c)
+			return
+		}
 
-		// Маршруты для комментариев
-		protected.POST("/comments", commentHandler.CreateComment)
-		protected.DELETE("/comments/:id", commentHandler.DeleteComment)
+		// Если нет токена, возвращаем 401
+		c.JSON(401, gin.H{"error": "требуется аутентификация"})
+		c.Abort()
+	})
 
-		// Маршруты для чата
-		protected.POST("/chat", chatHandler.CreateMessage)
-		protected.GET("/chat", chatHandler.GetMessages)
-	}
+	// Публичные маршруты
+	r.Use(func(c *gin.Context) {
+		// Проверяем токен в заголовке Authorization
+		authHeader := c.GetHeader("Authorization")
+		if authHeader != "" {
+			authMiddleware(c)
+			return
+		}
+
+		// Проверяем токен в куках
+		token, err := c.Cookie("auth_token")
+		if err == nil && token != "" {
+			// Если токен есть в куках, добавляем его в заголовок
+			c.Request.Header.Set("Authorization", "Bearer "+token)
+			authMiddleware(c)
+			return
+		}
+
+		// Если нет токена, продолжаем без аутентификации
+		c.Next()
+	})
+
+	// Маршруты для тредов
+	protected.POST("/threads", threadHandler.CreateThread)
+	protected.PUT("/threads/:id", threadHandler.UpdateThread)
+	protected.DELETE("/threads/:id", threadHandler.DeleteThread)
+	protected.GET("/threads/:id/posts", threadHandler.GetThreadPosts)
+	protected.GET("/threads", threadHandler.GetAllThreads)
+
+	// Маршруты для постов
+	protected.POST("/posts", postHandler.CreatePost)
+	protected.PUT("/posts/:id", postHandler.UpdatePost)
+	protected.DELETE("/posts/:id", postHandler.DeletePost)
+
+	// Маршруты для комментариев
+	protected.POST("/comments", commentHandler.CreateComment)
+	protected.DELETE("/comments/:id", commentHandler.DeleteComment)
+
+	// Маршруты для чата
+	protected.POST("/chat", chatHandler.CreateMessage)
+	protected.GET("/chat", chatHandler.GetMessages)
 
 	// Публичные маршруты
 	// Главная страница со списком тредов
@@ -187,6 +218,8 @@ func main() {
 		user, _ := c.Get("user")
 		userID, _ := c.Get("user_id")
 
+		log.Printf("Debug - User info: user=%+v, userID=%+v", user, userID)
+
 		// Проверяем, может ли пользователь редактировать пост
 		canEdit := false
 		if userID != nil && post.AuthorID == userID.(int) {
@@ -198,12 +231,13 @@ func main() {
 			comments[i].CanDelete = userID != nil && comments[i].AuthorID == userID.(int)
 		}
 
-		log.Printf("Отправка данных в шаблон: post=%+v, comments=%+v", post, comments)
+		log.Printf("Отправка данных в шаблон: post=%+v, comments=%+v, user=%+v, userID=%+v", post, comments, user, userID)
 
 		c.HTML(200, "post.html", gin.H{
 			"post":     post,
 			"comments": comments,
 			"user":     user,
+			"user_id":  userID,
 			"CanEdit":  canEdit,
 		})
 	})

@@ -23,46 +23,33 @@ func NewCommentHandler(service service.CommentService) *CommentHandler {
 }
 
 func (h *CommentHandler) CreateComment(c *gin.Context) {
-	var req CreateCommentRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		fmt.Printf("Ошибка при разборе JSON: %v\n", err)
-		fmt.Printf("Полученные данные: %+v\n", req)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Ошибка при разборе JSON: " + err.Error()})
-		return
+	var request struct {
+		PostID  int    `json:"post_id" binding:"required"`
+		Content string `json:"content" binding:"required"`
 	}
 
-	fmt.Printf("Получен запрос на создание комментария: %+v\n", req)
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(400, gin.H{"error": "неверный формат данных"})
+		return
+	}
 
 	// Получаем ID пользователя из контекста
 	userID, exists := c.Get("user_id")
 	if !exists {
-		fmt.Printf("Пользователь не авторизован\n")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "пользователь не авторизован"})
+		c.JSON(401, gin.H{"error": "пользователь не аутентифицирован"})
 		return
 	}
 
-	fmt.Printf("ID пользователя: %v\n", userID)
+	// Преобразуем uint в int
+	userIDInt := int(userID.(uint))
 
-	// Преобразуем post_id из строки в int
-	postID, err := strconv.Atoi(req.PostID)
+	comment, err := h.service.CreateComment(request.PostID, userIDInt, request.Content)
 	if err != nil {
-		fmt.Printf("Ошибка при преобразовании post_id: %v\n", err)
-		fmt.Printf("Полученный post_id: %v\n", req.PostID)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "неверный формат post_id"})
+		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
 
-	fmt.Printf("Преобразованный post_id: %v\n", postID)
-
-	comment, err := h.service.CreateComment(postID, userID.(int), req.Content)
-	if err != nil {
-		fmt.Printf("Ошибка при создании комментария: %v\n", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	fmt.Printf("Комментарий успешно создан: %+v\n", comment)
-	c.JSON(http.StatusCreated, comment)
+	c.JSON(201, comment)
 }
 
 func (h *CommentHandler) DeleteComment(c *gin.Context) {

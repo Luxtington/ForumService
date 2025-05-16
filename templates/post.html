@@ -122,7 +122,7 @@
     <div class="comments-section">
         <h3>Комментарии</h3>
         
-        {{if .user}}
+        {{if .user_id}}
         <form id="commentForm" class="comment-form">
             <textarea name="content" placeholder="Напишите комментарий..." required></textarea>
             <button type="submit" class="btn btn-primary">Отправить</button>
@@ -169,21 +169,51 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Проверяем наличие токена в куки
+            const getToken = () => {
+                const cookies = document.cookie.split(';');
+                for (let cookie of cookies) {
+                    const [name, value] = cookie.trim().split('=');
+                    if (name === 'auth_token') {
+                        return value;
+                    }
+                }
+                return null;
+            };
+
+            const token = getToken();
+            if (token) {
+                // Если токен есть, проверяем его валидность
+                fetch('/api/auth/validate', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        // Если токен невалиден, перезагружаем страницу
+                        window.location.reload();
+                    }
+                })
+                .catch(() => {
+                    window.location.reload();
+                });
+            }
+
             const commentForm = document.getElementById('commentForm');
             if (commentForm) {
                 commentForm.addEventListener('submit', function(e) {
                     e.preventDefault();
                     
-                    const token = localStorage.getItem('token');
+                    const token = getToken();
                     if (!token) {
                         alert('Пожалуйста, войдите в систему');
-                        window.location.href = '/login';
                         return;
                     }
 
                     const content = this.querySelector('textarea[name="content"]').value;
-                    const postId = {{.post.ID}};
-                    
+                    const postId = this.dataset.postId;
+
                     fetch('/api/comments', {
                         method: 'POST',
                         headers: {
@@ -191,62 +221,25 @@
                             'Authorization': `Bearer ${token}`
                         },
                         body: JSON.stringify({
-                            post_id: String(postId),
+                            post_id: postId,
                             content: content
                         })
                     })
                     .then(response => {
-                        if (!response.ok) {
-                            return response.json().then(data => {
-                                throw new Error(data.error || 'Ошибка при создании комментария');
-                            });
+                        if (response.ok) {
+                            window.location.reload();
+                        } else {
+                            alert('Ошибка при создании комментария');
                         }
-                        return response.json();
-                    })
-                    .then(comment => {
-                        // Очищаем форму
-                        this.querySelector('textarea[name="content"]').value = '';
-                        
-                        // Добавляем новый комментарий в начало списка
-                        const commentsContainer = document.getElementById('comments-container');
-                        const noComments = commentsContainer.querySelector('.text-center.text-muted');
-                        if (noComments) {
-                            noComments.remove();
-                        }
-                        
-                        const commentElement = document.createElement('div');
-                        commentElement.className = 'comment fade-in';
-                        commentElement.innerHTML = `
-                            <div class="comment-meta">
-                                <div class="d-flex align-items-center">
-                                    <i class="bi bi-person-circle me-2"></i>
-                                    <strong>${comment.author_name || 'Аноним'}</strong>
-                                </div>
-                                <div class="d-flex align-items-center">
-                                    <small class="text-muted me-3">
-                                        <i class="bi bi-clock"></i> ${new Date(comment.created_at).toLocaleString('ru-RU')}
-                                    </small>
-                                    ${comment.can_delete ? `
-                                    <button class="btn btn-sm btn-danger delete-comment" data-comment-id="${comment.id}">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                    ` : ''}
-                                </div>
-                            </div>
-                            <div class="comment-content">
-                                ${comment.content}
-                            </div>
-                        `;
-                        commentsContainer.insertBefore(commentElement, commentsContainer.firstChild);
                     })
                     .catch(error => {
                         console.error('Error:', error);
-                        alert(error.message);
+                        alert('Ошибка при создании комментария');
                     });
                 });
             }
 
-            // Обработчик удаления комментариев
+            // Обработчики удаления комментариев
             document.querySelectorAll('.delete-comment').forEach(button => {
                 button.addEventListener('click', function() {
                     if (!confirm('Вы уверены, что хотите удалить этот комментарий?')) {
@@ -254,7 +247,7 @@
                     }
 
                     const commentId = this.dataset.commentId;
-                    const token = localStorage.getItem('token');
+                    const token = getToken();
                     
                     fetch(`/api/comments/${commentId}`, {
                         method: 'DELETE',
@@ -263,14 +256,15 @@
                         }
                     })
                     .then(response => {
-                        if (!response.ok) {
-                            throw new Error('Ошибка при удалении комментария');
+                        if (response.ok) {
+                            window.location.reload();
+                        } else {
+                            alert('Ошибка при удалении комментария');
                         }
-                        this.closest('.comment').remove();
                     })
                     .catch(error => {
                         console.error('Error:', error);
-                        alert(error.message);
+                        alert('Ошибка при удалении комментария');
                     });
                 });
             });

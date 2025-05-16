@@ -1,54 +1,66 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Функция для получения токена
-    const getToken = () => {
-        // Получаем все куки
+    // Функция для получения токена из куки
+    function getToken() {
         const cookies = document.cookie.split(';');
         for (let cookie of cookies) {
             const [name, value] = cookie.trim().split('=');
             if (name === 'auth_token') {
-                return value;
+                return decodeURIComponent(value);
             }
         }
         return null;
-    };
+    }
 
-    // Функция для проверки авторизации
-    const checkAuth = () => {
+    // Функция для проверки аутентификации
+    function checkAuth() {
         const token = getToken();
         if (!token) {
-            console.log('Пользователь не авторизован');
+            window.location.href = 'http://localhost:8082/login';
             return false;
         }
         return true;
+    }
+
+    // Переопределяем fetch для добавления токена
+    const originalFetch = window.fetch;
+    window.fetch = function(url, options = {}) {
+        const token = getToken();
+        if (token) {
+            options.headers = {
+                ...options.headers,
+                'Authorization': `Bearer ${token}`
+            };
+        }
+        return originalFetch(url, options);
     };
 
-    // Обработка формы создания поста
-    document.querySelector('.new-post')?.addEventListener('submit', async (e) => {
+    // Проверяем аутентификацию при загрузке страницы
+    checkAuth();
+
+    // Обработчик отправки формы
+    document.getElementById('postForm')?.addEventListener('submit', async function(e) {
         e.preventDefault();
+        
         if (!checkAuth()) {
             alert('Пожалуйста, войдите в систему');
             return;
         }
 
-        const content = e.target.content.value;
+        const formData = new FormData(this);
         try {
             const response = await fetch('/api/posts', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${getToken()}`
-                },
-                body: JSON.stringify({
-                    thread_id: window.location.pathname.split('/')[2],
-                    content
-                })
+                body: formData
             });
 
             if (response.ok) {
                 window.location.reload();
+            } else {
+                const data = await response.json();
+                alert(data.error || 'Ошибка при создании поста');
             }
-        } catch (err) {
-            console.error(err);
+        } catch (error) {
+            alert('Ошибка при создании поста');
         }
     });
 
@@ -72,12 +84,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const postId = postIdInput.value;
             const content = textarea.value;
 
-            console.log('Отправка комментария:', {
-                post_id: postId,
-                content: content,
-                post_id_type: typeof postId
-            });
-
             if (!postId) {
                 alert('Ошибка: ID поста не найден');
                 return;
@@ -87,8 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const response = await fetch('/api/comments', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${getToken()}`
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
                         post_id: String(postId),
@@ -167,10 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const commentId = button.dataset.commentId;
             try {
                 const response = await fetch(`/api/comments/${commentId}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': `Bearer ${getToken()}`
-                    }
+                    method: 'DELETE'
                 });
 
                 if (response.ok) {

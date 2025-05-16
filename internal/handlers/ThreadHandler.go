@@ -39,24 +39,27 @@ func (h *ThreadHandler) CreateThread(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(400, gin.H{"error": "неверный формат данных"})
 		return
 	}
 
 	// Получаем ID пользователя из контекста
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "пользователь не аутентифицирован"})
+		c.JSON(401, gin.H{"error": "пользователь не аутентифицирован"})
 		return
 	}
 
-	thread, err := h.service.CreateThread(request.Title, userID.(int))
+	// Преобразуем uint в int
+	userIDInt := int(userID.(uint))
+
+	thread, err := h.service.CreateThread(request.Title, userIDInt)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, thread)
+	c.JSON(201, thread)
 }
 
 func (h *ThreadHandler) GetThreadWithPosts(c *gin.Context) {

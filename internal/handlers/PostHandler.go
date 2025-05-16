@@ -36,29 +36,34 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(400, gin.H{"error": "неверный формат данных"})
 		return
 	}
 
 	// Получаем ID пользователя из контекста
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "пользователь не аутентифицирован"})
+		c.JSON(401, gin.H{"error": "пользователь не аутентифицирован"})
 		return
 	}
 
+	// Преобразуем uint в int
+	userIDInt := int(userID.(uint))
+
+	// Создаем объект поста
 	post := &models.Post{
 		ThreadID: request.ThreadID,
-		AuthorID: userID.(int),
+		AuthorID: userIDInt,
 		Content:  request.Content,
 	}
 
+	// Создаем пост
 	if err := h.service.CreatePost(post); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, post)
+	c.JSON(201, post)
 }
 
 func (h *PostHandler) GetPost(c *gin.Context) {

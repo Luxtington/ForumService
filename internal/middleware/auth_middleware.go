@@ -1,73 +1,67 @@
 package middleware
 
 import (
-    "github.com/gin-gonic/gin"
-    "net/http"
-    "encoding/json"
-    "strings"
+	"encoding/json"
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"net/http"
+	"strings"
 )
 
 // AuthServiceMiddleware проверяет JWT токен через AuthService
 func AuthServiceMiddleware(authServiceURL string) gin.HandlerFunc {
-    return func(c *gin.Context) {
-        // Сначала проверяем заголовок Authorization
-        authHeader := c.GetHeader("Authorization")
-        var token string
-        if authHeader != "" {
-            // Убираем префикс "Bearer " если он есть
-            token = strings.TrimPrefix(authHeader, "Bearer ")
-        } else {
-            // Если нет в заголовке, проверяем куки
-            var err error
-            token, err = c.Cookie("auth_token")
-            if err != nil {
-                c.JSON(http.StatusUnauthorized, gin.H{"error": "требуется аутентификация"})
-                c.Abort()
-                return
-            }
-        }
+	return func(c *gin.Context) {
+		// Получаем токен из заголовка Authorization
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.JSON(401, gin.H{"error": "токен не предоставлен"})
+			c.Abort()
+			return
+		}
 
-        // Проверяем токен через AuthService
-        req, err := http.NewRequest("GET", authServiceURL+"/api/auth/validate", nil)
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при проверке аутентификации"})
-            c.Abort()
-            return
-        }
+		// Убираем префикс "Bearer " если он есть
+		token := strings.TrimPrefix(authHeader, "Bearer ")
 
-        // Добавляем куки в запрос
-        req.AddCookie(&http.Cookie{
-            Name:  "auth_token",
-            Value: token,
-        })
+		// Создаем запрос к AuthService
+		req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/auth/validate", authServiceURL), nil)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "ошибка при создании запроса"})
+			c.Abort()
+			return
+		}
 
-        client := &http.Client{}
-        resp, err := client.Do(req)
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при проверке аутентификации"})
-            c.Abort()
-            return
-        }
-        defer resp.Body.Close()
+		// Добавляем токен в заголовок
+		req.Header.Set("Authorization", "Bearer "+token)
 
-        if resp.StatusCode != http.StatusOK {
-            c.JSON(http.StatusUnauthorized, gin.H{"error": "недействительный токен"})
-            c.Abort()
-            return
-        }
+		// Выполняем запрос
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "ошибка при проверке токена"})
+			c.Abort()
+			return
+		}
+		defer resp.Body.Close()
 
-        // Получаем данные пользователя из ответа
-        var user struct {
-            ID int `json:"id"`
-        }
-        if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при получении данных пользователя"})
-            c.Abort()
-            return
-        }
+		if resp.StatusCode != http.StatusOK {
+			c.JSON(401, gin.H{"error": "недействительный токен"})
+			c.Abort()
+			return
+		}
 
-        // Добавляем ID пользователя в контекст
-        c.Set("user_id", user.ID)
-        c.Next()
-    }
+		// Декодируем ответ
+		var user struct {
+			ID       uint   `json:"id"`
+			Username string `json:"username"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
+			c.JSON(500, gin.H{"error": "ошибка при обработке ответа"})
+			c.Abort()
+			return
+		}
+
+		// Сохраняем информацию о пользователе в контексте
+		c.Set("user_id", user.ID)
+		c.Set("username", user.Username)
+	}
 } 

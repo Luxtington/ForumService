@@ -98,6 +98,10 @@
         </div>
     </nav>
 
+    <script>
+        window.userId = {{.user_id}};
+    </script>
+
     <div class="container py-4">
         <div class="row">
             <!-- Список тредов -->
@@ -117,6 +121,7 @@
                                 <h5 class="card-title mb-0">
                                     <a href="/threads/{{.ID}}" class="text-decoration-none">{{.Title}}</a>
                                 </h5>
+                                {{if eq .AuthorID $.user_id}}
                                 <div class="btn-group">
                                     <button type="button" class="btn btn-outline-primary btn-sm" onclick="editThread({{.ID}}, '{{.Title}}')">
                                         <i class="bi bi-pencil"></i>
@@ -125,6 +130,7 @@
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </div>
+                                {{end}}
                             </div>
                             <p class="card-text text-muted mt-2">
                                 <small>

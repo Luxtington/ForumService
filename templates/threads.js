@@ -72,6 +72,7 @@ function addThreadToList(thread) {
                 <h5 class="card-title mb-0">
                     <a href="/threads/${thread.id}" class="text-decoration-none">${thread.title || ''}</a>
                 </h5>
+                ${thread.author_id === window.userId ? `
                 <div class="btn-group">
                     <button type="button" class="btn btn-outline-primary btn-sm" onclick="editThread(${thread.id}, '${thread.title || ''}')">
                         <i class="bi bi-pencil"></i>
@@ -80,6 +81,7 @@ function addThreadToList(thread) {
                         <i class="bi bi-trash"></i>
                     </button>
                 </div>
+                ` : ''}
             </div>
             <p class="card-text text-muted mt-2">
                 <small>

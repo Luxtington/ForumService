@@ -272,9 +272,10 @@ func (r *threadRepository) DeleteThread(threadID int) error {
 
 func (r *threadRepository) GetAllThreads() ([]*models.Thread, error) {
 	query := `
-		SELECT id, title, created_at, updated_at
-		FROM threads
-		ORDER BY created_at DESC
+		SELECT t.id, t.title, t.author_id, t.created_at, t.updated_at, u.username as author_name
+		FROM threads t
+		LEFT JOIN users u ON t.author_id = u.id
+		ORDER BY t.created_at DESC
 	`
 	
 	rows, err := r.db.Query(query)
@@ -289,8 +290,10 @@ func (r *threadRepository) GetAllThreads() ([]*models.Thread, error) {
 		err := rows.Scan(
 			&thread.ID,
 			&thread.Title,
+			&thread.AuthorID,
 			&thread.CreatedAt,
 			&thread.UpdatedAt,
+			&thread.AuthorName,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("ошибка при сканировании треда: %v", err)

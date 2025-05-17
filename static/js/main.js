@@ -197,4 +197,98 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+
+    // Обработчики для тредов
+    document.querySelectorAll('.edit-thread').forEach(button => {
+        button.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation(); // Предотвращаем всплытие события
+            
+            if (!checkAuth()) {
+                alert('Пожалуйста, войдите в систему');
+                return;
+            }
+
+            const threadId = button.dataset.threadId;
+            const newTitle = prompt('Введите новое название треда:');
+            
+            if (!newTitle) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/threads/${threadId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({
+                        title: newTitle
+                    })
+                });
+
+                if (response.ok) {
+                    // Обновляем название треда на странице
+                    const threadTitle = button.closest('.thread-card').querySelector('.thread-title a');
+                    threadTitle.textContent = newTitle;
+                } else {
+                    const data = await response.json();
+                    throw new Error(data.error || 'Ошибка при редактировании треда');
+                }
+            } catch (err) {
+                console.error(err);
+                alert(err.message);
+            }
+        });
+    });
+
+    document.querySelectorAll('.delete-thread').forEach(button => {
+        button.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation(); // Предотвращаем всплытие события
+            
+            if (!checkAuth()) {
+                alert('Пожалуйста, войдите в систему');
+                return;
+            }
+
+            if (!confirm('Вы уверены, что хотите удалить этот тред?')) {
+                return;
+            }
+
+            const threadId = button.dataset.threadId;
+            try {
+                const response = await fetch(`/api/threads/${threadId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    // Удаляем элемент треда из DOM
+                    const threadElement = button.closest('.col-md-12');
+                    threadElement.remove();
+
+                    // Если больше нет тредов, показываем сообщение
+                    const threadsContainer = document.querySelector('.row');
+                    if (!threadsContainer.querySelector('.col-md-12')) {
+                        threadsContainer.innerHTML = `
+                            <div class="col-12 text-center text-muted">
+                                <i class="bi bi-chat-square-text display-4"></i>
+                                <p class="mt-3">Пока нет тредов. Создайте первый!</p>
+                            </div>
+                        `;
+                    }
+                } else {
+                    const data = await response.json();
+                    throw new Error(data.error || 'Ошибка при удалении треда');
+                }
+            } catch (err) {
+                console.error(err);
+                alert(err.message);
+            }
+        });
+    });
 });

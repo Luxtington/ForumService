@@ -242,6 +242,11 @@
 <body>
     <h1 class="thread-title">{{.Thread.Title}}</h1>
     
+    <script>
+        window.userId = {{.user_id}};
+        window.threadAuthorId = {{.Thread.AuthorID}};
+    </script>
+    
     {{if eq .Thread.AuthorID .user_id}}
     <button class="btn btn-primary add-post-btn" onclick="showCreatePostModal()">Добавить пост</button>
     {{end}}
@@ -342,7 +347,7 @@
                                 <div class="card-body">
                                     <div class="post-header">
                                         <h5 class="post-title">${post.title || 'Новый пост'}</h5>
-                                        {{if eq .Thread.AuthorID .user_id}}
+                                        ${window.threadAuthorId === window.userId ? `
                                         <div class="post-actions">
                                             <button class="btn btn-sm btn-outline-primary edit-post" data-post-id="${post.id}">
                                                 <i class="bi bi-pencil"></i>
@@ -351,7 +356,7 @@
                                                 <i class="bi bi-trash"></i>
                                             </button>
                                         </div>
-                                        {{end}}
+                                        ` : ''}
                                     </div>
                                     <p class="card-text">
                                         <i class="bi bi-person-circle"></i> ${post.author_name || 'Аноним'} • 

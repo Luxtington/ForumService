@@ -50,6 +50,18 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 	// Преобразуем uint в int
 	userIDInt := int(userID.(uint))
 
+	// Проверяем, является ли пользователь автором треда
+	thread, err := h.service.GetThreadByID(request.ThreadID)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "ошибка при получении информации о треде"})
+		return
+	}
+
+	if thread.AuthorID != userIDInt {
+		c.JSON(403, gin.H{"error": "нет прав для создания поста в этом треде"})
+		return
+	}
+
 	// Создаем объект поста
 	post := &models.Post{
 		ThreadID: request.ThreadID,
@@ -131,13 +143,24 @@ func (h *PostHandler) UpdatePost(c *gin.Context) {
 		return
 	}
 
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	userIDInt := int(userID.(uint))
+
 	var post models.Post
 	if err := c.ShouldBindJSON(&post); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := h.service.UpdatePost(&post, id); err != nil {
+	if err := h.service.UpdatePost(&post, id, userIDInt); err != nil {
+		if err == service.ErrNoPermission {
+			c.JSON(http.StatusForbidden, gin.H{"error": "no permission to update this post"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -152,7 +175,18 @@ func (h *PostHandler) DeletePost(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.DeletePost(id); err != nil {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	userIDInt := int(userID.(uint))
+
+	if err := h.service.DeletePost(id, userIDInt); err != nil {
+		if err == service.ErrNoPermission {
+			c.JSON(http.StatusForbidden, gin.H{"error": "no permission to delete this post"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

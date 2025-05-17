@@ -88,7 +88,18 @@ func (h *ThreadHandler) DeleteThread(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.DeleteThread(id); err != nil {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	userIDInt := int(userID.(uint))
+
+	if err := h.service.DeleteThread(id, userIDInt); err != nil {
+		if err == service.ErrNoPermission {
+			c.JSON(http.StatusForbidden, gin.H{"error": "no permission to delete this thread"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -103,6 +114,13 @@ func (h *ThreadHandler) UpdateThread(c *gin.Context) {
 		return
 	}
 
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	userIDInt := int(userID.(uint))
+
 	var req UpdateThreadRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -114,7 +132,11 @@ func (h *ThreadHandler) UpdateThread(c *gin.Context) {
 		Title: req.Title,
 	}
 
-	if err := h.service.UpdateThread(thread); err != nil {
+	if err := h.service.UpdateThread(thread, userIDInt); err != nil {
+		if err == service.ErrNoPermission {
+			c.JSON(http.StatusForbidden, gin.H{"error": "no permission to update this thread"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

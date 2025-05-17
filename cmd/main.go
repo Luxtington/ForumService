@@ -30,20 +30,16 @@ func main() {
 	}
 
 	// Инициализация репозиториев
-	//threadRepo := repository.NewThreadRepository(db)
+	threadRepo := repository.NewThreadRepository(db)
 	postRepo := repository.NewPostRepository(db)
 	commentRepo := repository.NewCommentRepository(db)
 	chatRepo := repository.NewChatRepository(db)
-    //userRepo := repository.NewUserRepository(db)
+	userRepo := repository.NewUserRepository(db)
 
 	// Инициализация сервисов
-	threadService := service.NewThreadService(
-		repository.NewThreadRepository(db),
-		repository.NewPostRepository(db),
-		repository.NewUserRepository(db),
-	)
-	postService := service.NewPostService(postRepo, commentRepo)
+	postService := service.NewPostService(postRepo, commentRepo, threadRepo)
 	commentService := service.NewCommentService(commentRepo)
+	threadService := service.NewThreadService(threadRepo, postRepo, userRepo)
 	chatService := service.NewChatService(chatRepo)
 
 	// Инициализация обработчиков
@@ -162,10 +158,17 @@ func main() {
 			})
 			return
 		}
+
+		// Преобразуем userID в int для корректного сравнения
+		var userIDInt int
+		if userID != nil {
+			userIDInt = int(userID.(uint))
+		}
+
 		c.HTML(200, "threads.html", gin.H{
 			"threads": threads,
 			"user": user,
-			"user_id": userID,
+			"user_id": userIDInt,
 		})
 	})
 
@@ -187,11 +190,18 @@ func main() {
 			})
 			return
 		}
+
+		// Преобразуем userID в int для корректного сравнения
+		var userIDInt int
+		if userID != nil {
+			userIDInt = int(userID.(uint))
+		}
+
 		c.HTML(200, "thread.html", gin.H{
-			"thread": thread,
+			"Thread": thread,
 			"posts":  posts,
 			"user": user,
-			"user_id": userID,
+			"user_id": userIDInt,
 		})
 	})
 

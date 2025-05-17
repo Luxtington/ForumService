@@ -9,16 +9,27 @@
         <div class="col-md-12 mb-3">
             <div class="card">
                 <div class="card-body">
-                    <h5 class="card-title">
-                        <a href="/threads/{{.ID}}" class="text-decoration-none">{{.Title}}</a>
-                    </h5>
-                    <p class="card-text">
-                        <small class="text-muted">
-                            Автор: {{.AuthorName}} | 
-                            Создан: {{.CreatedAt.Format "02.01.2006 15:04"}} | 
-                            Обновлен: {{.UpdatedAt.Format "02.01.2006 15:04"}}
-                        </small>
-                    </p>
+                    <div class="thread-card">
+                        <div class="thread-header">
+                            <h3 class="thread-title">
+                                <a href="/threads/{{.ID}}" class="text-decoration-none">{{.Title}}</a>
+                            </h3>
+                            {{if eq .AuthorID $.user_id}}
+                            <div class="thread-actions">
+                                <button class="btn btn-sm btn-outline-primary edit-thread" data-thread-id="{{.ID}}">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger delete-thread" data-thread-id="{{.ID}}">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                            {{end}}
+                        </div>
+                        <div class="thread-meta">
+                            <span class="author">Автор: {{.AuthorName}}</span>
+                            <span class="date">Создан: {{.CreatedAt.Format "02.01.2006 15:04"}}</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

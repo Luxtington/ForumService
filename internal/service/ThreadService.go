@@ -10,8 +10,8 @@ import (
 type ThreadService interface {
 	GetThreadWithPosts(threadID int) (*models.Thread, []*models.Post, error)
 	CreateThread(title string, authorID int) (*models.Thread, error)
-	UpdateThread(thread *models.Thread) error
-	DeleteThread(threadID int) error
+	UpdateThread(thread *models.Thread, userID int) error
+	DeleteThread(threadID int, userID int) error
 	GetAllThreads() ([]*models.Thread, error)
 	GetPostsByThreadID(threadID int) ([]*models.Post, error)
 	GetUserByID(userID int) (*models.User, error)
@@ -67,11 +67,29 @@ func (s *threadService) CreateThread(title string, authorID int) (*models.Thread
 	return thread, nil
 }
 
-func (s *threadService) UpdateThread(thread *models.Thread) error {
+func (s *threadService) UpdateThread(thread *models.Thread, userID int) error {
+	existingThread, err := s.threadRepo.GetByID(thread.ID)
+	if err != nil {
+		return err
+	}
+
+	if existingThread.AuthorID != userID {
+		return ErrNoPermission
+	}
+
 	return s.threadRepo.Update(thread)
 }
 
-func (s *threadService) DeleteThread(threadID int) error {
+func (s *threadService) DeleteThread(threadID int, userID int) error {
+	thread, err := s.threadRepo.GetByID(threadID)
+	if err != nil {
+		return err
+	}
+
+	if thread.AuthorID != userID {
+		return ErrNoPermission
+	}
+
 	return s.threadRepo.Delete(threadID)
 }
 

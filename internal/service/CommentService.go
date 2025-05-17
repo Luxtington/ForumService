@@ -10,7 +10,7 @@ type CommentService interface {
 	CreateComment(postID, authorID int, content string) (*models.Comment, error)
 	GetCommentByID(id int) (*models.Comment, error)
 	GetCommentsByPostID(postID int) ([]models.Comment, error)
-	DeleteComment(id int, userID int, isAdmin bool) error
+	DeleteComment(id int, userID int) error
 }
 
 type commentService struct {
@@ -51,15 +51,15 @@ func (s *commentService) GetCommentsByPostID(postID int) ([]models.Comment, erro
 	return comments, nil
 }
 
-func (s *commentService) DeleteComment(id int, userID int, isAdmin bool) error {
+func (s *commentService) DeleteComment(id int, userID int) error {
 	// Проверяем, существует ли комментарий
 	comment, err := s.repo.GetCommentByID(id)
 	if err != nil {
 		return fmt.Errorf("comment not found: %w", err)
 	}
 
-	if !isAdmin && comment.AuthorID != userID {
-		return fmt.Errorf("there are no rights for comment delete")
+	if comment.AuthorID != userID {
+		return ErrNoPermission
 	}
 
 	if err := s.repo.DeleteComment(id); err != nil {

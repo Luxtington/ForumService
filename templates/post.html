@@ -113,6 +113,16 @@
             {{if .post.AuthorName}}
             <span class="author">Автор: {{.post.AuthorName}}</span>
             {{end}}
+            {{if eq .post.AuthorID .user_id}}
+            <div class="post-actions">
+                <button class="btn btn-sm btn-outline-primary edit-post" data-post-id="{{.post.ID}}">
+                    <i class="bi bi-pencil"></i> Редактировать
+                </button>
+                <button class="btn btn-sm btn-outline-danger delete-post" data-post-id="{{.post.ID}}">
+                    <i class="bi bi-trash"></i> Удалить
+                </button>
+            </div>
+            {{end}}
         </div>
         <div class="post-content">
             {{.post.Content}}
@@ -146,7 +156,7 @@
                             <small class="text-muted me-3">
                                 <i class="bi bi-clock"></i> {{.CreatedAt.Format "02.01.2006 15:04"}}
                             </small>
-                            {{if .CanDelete}}
+                            {{if eq .AuthorID $.user_id}}
                             <button class="btn btn-sm btn-danger delete-comment" data-comment-id="{{.ID}}">
                                 <i class="bi bi-trash"></i>
                             </button>

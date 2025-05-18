@@ -71,7 +71,7 @@ func main() {
 
 	// Настройка CORS
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:8082"},
+		AllowOrigins:     []string{"http://localhost:8081"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Cookie", "X-Requested-With"},
 		ExposeHeaders:    []string{"Content-Length", "Set-Cookie"},
@@ -180,7 +180,7 @@ func main() {
 	})
 
 	// Главная страница со списком тредов
-	r.GET("/", func(c *gin.Context) {
+	r.GET("/", authMiddleware, func(c *gin.Context) {
 		user, _ := c.Get("user")
 		userID, _ := c.Get("user_id")
 		userRole, _ := c.Get("user_role")
@@ -194,7 +194,7 @@ func main() {
 		// Преобразуем userID в int для корректного сравнения
 		var userIDInt int
 		if userID != nil {
-			userIDInt = int(userID.(uint))
+			userIDInt = int(userID.(uint32))
 		}
 
 		fmt.Printf("Debug - User ID in /: %d\n", userIDInt)
@@ -241,7 +241,7 @@ func main() {
 		// Преобразуем userID в int для корректного сравнения
 		var userIDInt int
 		if userID != nil {
-			userIDInt = int(userID.(uint))
+			userIDInt = int(userID.(uint32))
 		}
 
 		fmt.Printf("Debug - User ID in /threads: %d\n", userIDInt)
@@ -286,7 +286,7 @@ func main() {
 		// Преобразуем userID в int для корректного сравнения
 		var userIDInt int
 		if userID != nil {
-			userIDInt = int(userID.(uint))
+			userIDInt = int(userID.(uint32))
 		}
 
 		fmt.Printf("Debug - Thread Author ID: %d\n", thread.AuthorID)
@@ -332,7 +332,7 @@ func main() {
 
 		// Проверяем, может ли пользователь редактировать пост
 		if userID != nil {
-			userIDInt := int(userID.(uint))
+			userIDInt := int(userID.(uint32))
 			if post.AuthorID == userIDInt {
 				post.CanEdit = true
 			}
@@ -341,7 +341,7 @@ func main() {
 		// Добавляем флаг CanDelete для комментариев
 		for i := range comments {
 			if userID != nil {
-				userIDInt := int(userID.(uint))
+				userIDInt := int(userID.(uint32))
 				comments[i].CanDelete = comments[i].AuthorID == userIDInt
 			}
 		}

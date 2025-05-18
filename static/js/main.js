@@ -26,16 +26,19 @@ document.addEventListener('DOMContentLoaded', () => {
     window.fetch = function(url, options = {}) {
         const token = getToken();
         if (token) {
-            options.headers = {
-                ...options.headers,
-                'Authorization': `Bearer ${token}`
-            };
+            if (!options.headers) {
+                options.headers = {};
+            }
+            options.headers['Authorization'] = `Bearer ${token}`;
+            options.credentials = 'include'; // Важно для работы с куками
         }
         return originalFetch(url, options);
     };
 
     // Проверяем аутентификацию при загрузке страницы
-    checkAuth();
+    if (!checkAuth()) {
+        return;
+    }
 
     // Обработчик отправки формы
     document.getElementById('postForm')?.addEventListener('submit', async function(e) {
@@ -220,8 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const response = await fetch(`/api/threads/${threadId}`, {
                     method: 'PUT',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
                         title: newTitle
@@ -260,10 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const threadId = button.dataset.threadId;
             try {
                 const response = await fetch(`/api/threads/${threadId}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
+                    method: 'DELETE'
                 });
 
                 if (response.ok) {

@@ -10,16 +10,22 @@ import (
 // AuthServiceMiddleware проверяет JWT токен через AuthService
 func AuthServiceMiddleware(authClient *client.AuthClient) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Получаем токен из заголовка Authorization
+		// Получаем токен из заголовка Authorization или из куки
 		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
+		token := strings.TrimPrefix(authHeader, "Bearer ")
+
+		// Если токен не найден в заголовке, пробуем получить из куки
+		if token == "" {
+			if cookieToken, err := c.Cookie("auth_token"); err == nil {
+				token = cookieToken
+			}
+		}
+
+		if token == "" {
 			c.JSON(401, gin.H{"error": "токен не предоставлен"})
 			c.Abort()
 			return
 		}
-
-		// Убираем префикс "Bearer " если он есть
-		token := strings.TrimPrefix(authHeader, "Bearer ")
 
 		// Проверяем токен через gRPC клиент
 		userID, username, role, err := authClient.ValidateToken(token)

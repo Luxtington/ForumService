@@ -2,6 +2,8 @@ package repository
 
 import (
 	"database/sql"
+	"log"
+	"time"
 
 	"ForumService/internal/models"
 	"fmt"
@@ -10,6 +12,7 @@ import (
 type ChatRepository interface {
 	CreateMessage(authorID int, content string) (*models.ChatMessage, error)
 	GetAllMessages() ([]*models.ChatMessage, error)
+	DeleteOldMessages() error
 }
 
 type chatRepository struct {
@@ -17,7 +20,9 @@ type chatRepository struct {
 }
 
 func NewChatRepository(db *sql.DB) ChatRepository {
-	return &chatRepository{db: db}
+	repo := &chatRepository{db: db}
+	go repo.startMessageCleanup()
+	return repo
 }
 
 func (r *chatRepository) CreateMessage(authorID int, content string) (*models.ChatMessage, error) {
@@ -54,7 +59,7 @@ func (r *chatRepository) GetAllMessages() ([]*models.ChatMessage, error) {
 		SELECT cm.id, cm.author_id, cm.content, cm.created_at, u.username as author_name 
 		FROM chat_messages cm
 		LEFT JOIN users u ON cm.author_id = u.id 
-		ORDER BY cm.created_at DESC`
+		ORDER BY cm.created_at ASC`
 	
 	rows, err := r.db.Query(query)
 	if err != nil {
@@ -83,4 +88,41 @@ func (r *chatRepository) GetAllMessages() ([]*models.ChatMessage, error) {
 	}
 
 	return messages, nil
+}
+
+func (r *chatRepository) DeleteOldMessages() error {
+	query := `DELETE FROM chat_messages WHERE created_at < NOW() - INTERVAL '1 minute' RETURNING id`
+	rows, err := r.db.Query(query)
+	if err != nil {
+		log.Printf("Ошибка при удалении старых сообщений: %v", err)
+		return err
+	}
+	defer rows.Close()
+
+	var deletedIDs []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			log.Printf("Ошибка при сканировании ID удаленного сообщения: %v", err)
+			continue
+		}
+		deletedIDs = append(deletedIDs, id)
+	}
+
+	if len(deletedIDs) > 0 {
+		log.Printf("Удалены сообщения с ID: %v", deletedIDs)
+	}
+
+	return nil
+}
+
+func (r *chatRepository) startMessageCleanup() {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		if err := r.DeleteOldMessages(); err != nil {
+			log.Printf("Ошибка при очистке старых сообщений: %v", err)
+		}
+	}
 } 

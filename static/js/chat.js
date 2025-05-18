@@ -181,8 +181,13 @@ function loadChatMessages() {
         })
         .then(data => {
             const chatMessages = document.getElementById('chatMessages');
+            if (!chatMessages) {
+                console.error('Элемент #chatMessages не найден');
+                return;
+            }
+            
             chatMessages.innerHTML = '';
-            if (data.length === 0) {
+            if (!data || data.length === 0) {
                 chatMessages.innerHTML = `
                     <div class="text-center text-muted py-5">
                         <i class="bi bi-chat-square-text display-1"></i>
@@ -196,7 +201,15 @@ function loadChatMessages() {
         })
         .catch(error => {
             console.error('Ошибка при загрузке сообщений чата:', error);
-            alert('Не удалось загрузить сообщения чата. Пожалуйста, обновите страницу.');
+            const chatMessages = document.getElementById('chatMessages');
+            if (chatMessages) {
+                chatMessages.innerHTML = `
+                    <div class="text-center text-danger py-5">
+                        <i class="bi bi-exclamation-triangle display-1"></i>
+                        <p class="mt-3">Ошибка при загрузке сообщений. Попробуйте обновить страницу.</p>
+                    </div>
+                `;
+            }
         });
 }
 
@@ -205,4 +218,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadChatMessages();
     initWebSocket();
     scrollChatToBottom();
+    
+    // Обновляем сообщения каждые 30 секунд
+    setInterval(loadChatMessages, 30000);
 }); 

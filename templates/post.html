@@ -113,7 +113,7 @@
             {{if .post.AuthorName}}
             <span class="author">Автор: {{.post.AuthorName}}</span>
             {{end}}
-            {{if eq .post.AuthorID .user_id}}
+            {{if or (eq .post.AuthorID .user_id) (eq .user_role "admin")}}
             <div class="post-actions">
                 <button class="btn btn-sm btn-outline-primary edit-post" data-post-id="{{.post.ID}}">
                     <i class="bi bi-pencil"></i> Редактировать
@@ -156,11 +156,22 @@
                             <small class="text-muted me-3">
                                 <i class="bi bi-clock"></i> {{.CreatedAt.Format "02.01.2006 15:04"}}
                             </small>
-                            {{if eq .AuthorID $.user_id}}
-                            <button class="btn btn-sm btn-danger delete-comment" data-comment-id="{{.ID}}">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                            {{end}}
+                            <div class="comment-actions">
+                                {{if eq $.user_role "admin"}}
+                                    <!-- Админ видит обе кнопки для всех комментариев -->
+                                    <button class="btn btn-sm btn-outline-primary edit-comment" data-comment-id="{{.ID}}">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger delete-comment" data-comment-id="{{.ID}}">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                {{else if eq .AuthorID $.user_id}}
+                                    <!-- Автор видит только кнопку удаления для своих комментариев -->
+                                    <button class="btn btn-sm btn-outline-danger delete-comment" data-comment-id="{{.ID}}">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                {{end}}
+                            </div>
                         </div>
                     </div>
                     <div class="comment-content">
@@ -178,105 +189,133 @@
     </div>
 
     <script>
+        // Отладочная информация в HTML
+        console.log('Template values:');
+        console.log('User Role from template:', "{{ .user_role }}");
+        console.log('User ID from template:', {{ .user_id }});
+
+        // Инициализация переменных из шаблона
+        const userId = {{ .user_id }};
+        const userRole = "{{ .user_role }}";
+        
+        // Отладочная информация
+        console.log('User ID:', userId, typeof userId);
+        console.log('User Role:', userRole, typeof userRole);
+        console.log('Raw user role:', userRole);
+        console.log('Is Admin:', userRole === "admin");
+
         // Обработчик формы создания комментария
-        document.getElementById('commentForm').addEventListener('submit', function(e) {
+        document.getElementById('commentForm')?.addEventListener('submit', async function(e) {
             e.preventDefault();
             const content = this.querySelector('textarea[name="content"]').value;
-            const postId = {{.post.ID}};
             
-            fetch('/api/comments', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    post_id: postId,
-                    content: content
-                })
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Ошибка при создании комментария');
-                }
-                return response.json();
-            })
-            .then(comment => {
-                // Очищаем форму
-                this.querySelector('textarea[name="content"]').value = '';
-                
-                // Добавляем новый комментарий в начало списка
-                const commentsContainer = document.getElementById('comments-container');
-                const noComments = commentsContainer.querySelector('.text-center.text-muted');
-                if (noComments) {
-                    noComments.remove();
-                }
-                
-                const commentElement = document.createElement('div');
-                commentElement.className = 'comment fade-in';
-                commentElement.innerHTML = `
-                    <div class="comment-meta">
-                        <div class="d-flex align-items-center">
-                            <i class="bi bi-person-circle me-2"></i>
-                            <strong>${comment.author_name}</strong>
-                        </div>
-                        <div class="d-flex align-items-center">
-                            <small class="text-muted me-3">
-                                <i class="bi bi-clock"></i> ${new Date(comment.created_at).toLocaleString()}
-                            </small>
-                            <button class="btn btn-sm btn-danger delete-comment" data-comment-id="${comment.id}">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="comment-content">
-                        ${comment.content}
-                    </div>
-                `;
-                
-                commentsContainer.insertBefore(commentElement, commentsContainer.firstChild);
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert(error.message);
-            });
-        });
-
-        // Обработчик удаления комментариев
-        document.querySelectorAll('.delete-comment').forEach(button => {
-            button.addEventListener('click', function(e) {
-                e.preventDefault();
-                if (!confirm('Вы уверены, что хотите удалить этот комментарий?')) {
-                    return;
-                }
-
-                const commentId = this.dataset.commentId;
-                fetch(`/api/comments/${commentId}`, {
-                    method: 'DELETE'
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Ошибка при удалении комментария');
-                    }
-                    // Удаляем элемент комментария из DOM
-                    this.closest('.comment').remove();
-                    
-                    // Если больше нет комментариев, показываем сообщение
-                    const commentsContainer = document.getElementById('comments-container');
-                    if (!commentsContainer.querySelector('.comment')) {
-                        commentsContainer.innerHTML = `
-                            <div class="text-center text-muted">
-                                <i class="bi bi-chat-square-text display-4"></i>
-                                <p class="mt-3">Пока нет комментариев. Будьте первым!</p>
-                            </div>
-                        `;
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert(error.message);
+            try {
+                const response = await fetch('/api/comments', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${getToken()}`
+                    },
+                    body: JSON.stringify({
+                        post_id: {{ .post.ID }},
+                        content: content
+                    })
                 });
-            });
+
+                if (response.ok) {
+                    const comment = await response.json();
+                    const commentsContainer = document.getElementById('comments-container');
+                    
+                    // Создаем HTML для нового комментария
+                    const commentHtml = `
+                        <div class="comment fade-in">
+                            <div class="comment-meta">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-person-circle me-2"></i>
+                                    <strong>${comment.author_name}</strong>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <small class="text-muted me-3">
+                                        <i class="bi bi-clock"></i> ${new Date(comment.created_at).toLocaleString()}
+                                    </small>
+                                    <div class="comment-actions">
+                                        ${userRole === "admin" ? `
+                                            <button class="btn btn-sm btn-outline-primary edit-comment" data-comment-id="${comment.id}">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-danger delete-comment" data-comment-id="${comment.id}">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        ` : comment.author_id === userId ? `
+                                            <button class="btn btn-sm btn-outline-danger delete-comment" data-comment-id="${comment.id}">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="comment-content">
+                                ${comment.content}
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Добавляем комментарий в начало списка
+                    commentsContainer.insertAdjacentHTML('afterbegin', commentHtml);
+                    
+                    // Очищаем форму
+                    this.reset();
+                } else {
+                    const error = await response.json();
+                    alert(error.error || 'Ошибка при создании комментария');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Ошибка при создании комментария');
+            }
         });
+
+        // Обработчик удаления комментария
+        document.addEventListener('click', async function(e) {
+            if (e.target.closest('.delete-comment')) {
+                const button = e.target.closest('.delete-comment');
+                const commentId = button.dataset.commentId;
+                
+                if (confirm('Вы уверены, что хотите удалить этот комментарий?')) {
+                    try {
+                        const response = await fetch(`/api/comments/${commentId}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Authorization': `Bearer ${getToken()}`
+                            }
+                        });
+
+                        if (response.ok) {
+                            // Удаляем комментарий из DOM
+                            button.closest('.comment').remove();
+                        } else {
+                            const error = await response.json();
+                            alert(error.error || 'Ошибка при удалении комментария');
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        alert('Ошибка при удалении комментария');
+                    }
+                }
+            }
+        });
+
+        // Функция для получения токена из куки
+        function getToken() {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'auth_token') {
+                    return value;
+                }
+            }
+            return null;
+        }
     </script>
 </body>
-</html> 
+</html>

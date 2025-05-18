@@ -121,7 +121,7 @@
                                 <h5 class="card-title mb-0">
                                     <a href="/threads/{{.ID}}" class="text-decoration-none">{{.Title}}</a>
                                 </h5>
-                                {{if eq .AuthorID $.user_id}}
+                                {{if or (eq .AuthorID $.user_id) (eq $.user_role "admin")}}
                                 <div class="btn-group">
                                     <button type="button" class="btn btn-outline-primary btn-sm" onclick="editThread({{.ID}}, '{{.Title}}')">
                                         <i class="bi bi-pencil"></i>

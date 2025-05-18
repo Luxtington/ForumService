@@ -4,6 +4,13 @@
 <div class="container mt-4">
     <h1>Список тредов</h1>
     
+    <script>
+        window.userId = {{if .user_id}}{{.user_id}}{{else}}null{{end}};
+        window.userRole = "{{.user_role}}";
+        console.log('Debug - User ID:', window.userId);
+        console.log('Debug - User Role:', window.userRole);
+    </script>
+    
     <div class="row">
         {{range .threads}}
         <div class="col-md-12 mb-3">
@@ -14,7 +21,7 @@
                             <h3 class="thread-title">
                                 <a href="/threads/{{.ID}}" class="text-decoration-none">{{.Title}}</a>
                             </h3>
-                            {{if eq .AuthorID $.user_id}}
+                            {{if or (eq .AuthorID $.user_id) (eq $.user_role "admin")}}
                             <div class="thread-actions">
                                 <button class="btn btn-sm btn-outline-primary edit-thread" data-thread-id="{{.ID}}">
                                     <i class="bi bi-pencil"></i>

@@ -49,9 +49,19 @@ func (h *ViewsHandler) Index(c *gin.Context) {
 		return
 	}
 
+	userRole, _ := c.Get("user_role")
+	if userRole == nil {
+		userRole = "user"
+	}
+	fmt.Printf("Debug - User Role in ViewsHandler: %v\n", userRole)
+
+	userID, _ := c.Get("user_id")
+
 	c.HTML(http.StatusOK, "index.html", gin.H{
 		"Threads":      threads,
 		"ChatMessages": chatMessages,
+		"user_role":    userRole,
+		"user_id":      userID,
 	})
 }
 
@@ -114,9 +124,18 @@ func (h *ViewsHandler) ShowThread(c *gin.Context) {
 	fmt.Printf("Тред найден: %+v\n", thread)
 	fmt.Printf("Количество постов: %d\n", len(posts))
 
+	userRole, _ := c.Get("user_role")
+	if userRole == nil {
+		userRole = "user"
+	}
+
+	userID, _ := c.Get("user_id")
+
 	c.HTML(http.StatusOK, "thread.html", gin.H{
-		"Thread": thread,
-		"Posts":  posts,
+		"Thread":    thread,
+		"Posts":     posts,
+		"user_role": userRole,
+		"user_id":   userID,
 	})
 }
 
@@ -144,8 +163,45 @@ func (h *ViewsHandler) ShowPost(c *gin.Context) {
 	fmt.Printf("Пост найден: %+v\n", post)
 	fmt.Printf("Получено комментариев: %d\n", len(comments))
 
+	// Получаем роль пользователя из контекста
+	userRole, exists := c.Get("user_role")
+	if !exists {
+		fmt.Printf("Debug - Role not found in context, setting default\n")
+		userRole = "user"
+	}
+	fmt.Printf("Debug - User Role in ShowPost: %v (type: %T)\n", userRole, userRole)
+	fmt.Printf("Debug - Raw user role in ShowPost: %q\n", userRole)
+
+	// Проверяем, что роль является строкой
+	if roleStr, ok := userRole.(string); ok {
+		fmt.Printf("Debug - Role is string: %q\n", roleStr)
+		userRole = roleStr
+	} else {
+		fmt.Printf("Debug - Role is not string: %T\n", userRole)
+		userRole = "user"
+	}
+
+	// Получаем ID пользователя из контекста
+	userID, exists := c.Get("user_id")
+	if !exists {
+		fmt.Printf("Debug - User ID not found in context\n")
+		userID = 0
+	}
+	fmt.Printf("Debug - User ID in ShowPost: %v (type: %T)\n", userID, userID)
+
+	// Проверяем данные комментариев
+	for i, comment := range comments {
+		fmt.Printf("Debug - Comment %d: ID=%d, AuthorID=%d\n", i, comment.ID, comment.AuthorID)
+	}
+
+	// Отправляем данные в шаблон
+	fmt.Printf("Отправка данных в шаблон: post=%+v, comments=%+v, user_role=%v, user_id=%v\n", 
+		post, comments, userRole, userID)
+
 	c.HTML(http.StatusOK, "post.html", gin.H{
 		"post":     post,
 		"comments": comments,
+		"user_id":  userID,
+		"user_role": userRole,
 	})
 }

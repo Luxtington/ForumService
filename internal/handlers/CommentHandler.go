@@ -67,12 +67,30 @@ func (h *CommentHandler) DeleteComment(c *gin.Context) {
 
 	userIDInt := int(userID.(uint))
 
+	// Получаем роль пользователя
+	userRole, _ := c.Get("user_role")
+	if userRole == nil {
+		userRole = "user"
+	}
+
+	// Отладочная информация
+	fmt.Printf("Debug - DeleteComment - User ID: %d, Role: %v\n", userIDInt, userRole)
+	fmt.Printf("Debug - DeleteComment - User Role type: %T\n", userRole)
+
+	// Проверяем, является ли пользователь автором комментария или администратором
+	comment, err := h.service.GetCommentByID(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при получении комментария"})
+		return
+	}
+
+	if comment.AuthorID != userIDInt && userRole != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "нет прав для удаления этого комментария"})
+		return
+	}
+
 	err = h.service.DeleteComment(id, userIDInt)
 	if err != nil {
-		if err == service.ErrNoPermission {
-			c.JSON(http.StatusForbidden, gin.H{"error": "нет прав для удаления этого комментария"})
-			return
-		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

@@ -33,4 +33,5 @@ type UserRepository interface {
 	GetUserByID(id int) (*models.User, error)
 	GetUserPosts(userID int) ([]*models.Post, error)
 	GetUserCommentCount(userID int) (int, error)
+	GetUserRole(userID int) (string, error)
 } 

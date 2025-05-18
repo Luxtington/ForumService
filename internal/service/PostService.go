@@ -25,13 +25,15 @@ type postService struct {
 	repo        repository.PostRepository
 	commentRepo repository.CommentRepository
 	threadRepo  repository.ThreadRepository
+	userRepo    repository.UserRepository
 }
 
-func NewPostService(repo repository.PostRepository, commentRepo repository.CommentRepository, threadRepo repository.ThreadRepository) PostService {
+func NewPostService(repo repository.PostRepository, commentRepo repository.CommentRepository, threadRepo repository.ThreadRepository, userRepo repository.UserRepository) PostService {
 	return &postService{
 		repo:        repo,
 		commentRepo: commentRepo,
 		threadRepo:  threadRepo,
+		userRepo:    userRepo,
 	}
 }
 
@@ -79,7 +81,13 @@ func (s *postService) UpdatePost(post *models.Post, postID int, userID int) erro
 		return err
 	}
 
-	if existingPost.AuthorID != userID {
+	// Получаем роль пользователя
+	userRole, err := s.userRepo.GetUserRole(userID)
+	if err != nil {
+		return err
+	}
+
+	if existingPost.AuthorID != userID && userRole != "admin" {
 		return ErrNoPermission
 	}
 
@@ -92,7 +100,13 @@ func (s *postService) DeletePost(postID int, userID int) error {
 		return err
 	}
 
-	if post.AuthorID != userID {
+	// Получаем роль пользователя
+	userRole, err := s.userRepo.GetUserRole(userID)
+	if err != nil {
+		return err
+	}
+
+	if post.AuthorID != userID && userRole != "admin" {
 		return ErrNoPermission
 	}
 

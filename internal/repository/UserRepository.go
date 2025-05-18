@@ -100,6 +100,17 @@ func (r *userRepository) GetUserCommentCount(userID int) (int, error) {
 	return count, nil
 }
 
+func (r *userRepository) GetUserRole(userID int) (string, error) {
+	var role string
+	err := r.db.QueryRow("SELECT role FROM users WHERE id = $1", userID).Scan(&role)
+	if err != nil {
+		fmt.Printf("Debug - UserRepository.GetUserRole - Error: %v\n", err)
+		return "", fmt.Errorf("couldn't get user role: %w", err)
+	}
+	fmt.Printf("Debug - UserRepository.GetUserRole - User ID: %d, Role: %s\n", userID, role)
+	return role, nil
+}
+
 /*
 CREATE TYPE user_role AS ENUM ('admin', 'user');
 

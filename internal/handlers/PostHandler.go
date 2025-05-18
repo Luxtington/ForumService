@@ -150,17 +150,31 @@ func (h *PostHandler) UpdatePost(c *gin.Context) {
 	}
 	userIDInt := int(userID.(uint))
 
+	// Получаем роль пользователя
+	userRole, _ := c.Get("user_role")
+	if userRole == nil {
+		userRole = "user"
+	}
+
 	var post models.Post
 	if err := c.ShouldBindJSON(&post); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := h.service.UpdatePost(&post, id, userIDInt); err != nil {
-		if err == service.ErrNoPermission {
+	// Проверяем, является ли пользователь автором поста или администратором
+	existingPost, err := h.service.GetPostByID(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при получении поста"})
+		return
+	}
+
+	if existingPost.AuthorID != userIDInt && userRole != "admin" {
 			c.JSON(http.StatusForbidden, gin.H{"error": "no permission to update this post"})
 			return
 		}
+
+	if err := h.service.UpdatePost(&post, id, userIDInt); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -182,11 +196,25 @@ func (h *PostHandler) DeletePost(c *gin.Context) {
 	}
 	userIDInt := int(userID.(uint))
 
-	if err := h.service.DeletePost(id, userIDInt); err != nil {
-		if err == service.ErrNoPermission {
+	// Получаем роль пользователя
+	userRole, _ := c.Get("user_role")
+	if userRole == nil {
+		userRole = "user"
+	}
+
+	// Проверяем, является ли пользователь автором поста или администратором
+	post, err := h.service.GetPostByID(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при получении поста"})
+		return
+	}
+
+	if post.AuthorID != userIDInt && userRole != "admin" {
 			c.JSON(http.StatusForbidden, gin.H{"error": "no permission to delete this post"})
 			return
 		}
+
+	if err := h.service.DeletePost(id, userIDInt); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

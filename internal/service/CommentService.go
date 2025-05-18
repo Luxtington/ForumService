@@ -14,11 +14,15 @@ type CommentService interface {
 }
 
 type commentService struct {
-	repo repository.CommentRepository
+	repo     repository.CommentRepository
+	userRepo repository.UserRepository
 }
 
-func NewCommentService(repo repository.CommentRepository) CommentService {
-	return &commentService{repo: repo}
+func NewCommentService(repo repository.CommentRepository, userRepo repository.UserRepository) CommentService {
+	return &commentService{
+		repo:     repo,
+		userRepo: userRepo,
+	}
 }
 
 func (s *commentService) CreateComment(postID, authorID int, content string) (*models.Comment, error) {
@@ -51,20 +55,26 @@ func (s *commentService) GetCommentsByPostID(postID int) ([]models.Comment, erro
 	return comments, nil
 }
 
-func (s *commentService) DeleteComment(id int, userID int) error {
-	// Проверяем, существует ли комментарий
-	comment, err := s.repo.GetCommentByID(id)
+func (s *commentService) DeleteComment(commentID int, userID int) error {
+	// Проверяем существование комментария
+	comment, err := s.repo.GetCommentByID(commentID)
 	if err != nil {
-		return fmt.Errorf("comment not found: %w", err)
+		return err
 	}
 
-	if comment.AuthorID != userID {
+	// Получаем роль пользователя
+	userRole, err := s.userRepo.GetUserRole(userID)
+	if err != nil {
+		return err
+	}
+
+	// Отладочная информация
+	fmt.Printf("Debug - CommentService.DeleteComment - User ID: %d, Role: %s\n", userID, userRole)
+
+	// Проверяем права доступа
+	if comment.AuthorID != userID && userRole != "admin" {
 		return ErrNoPermission
 	}
 
-	if err := s.repo.DeleteComment(id); err != nil {
-		return fmt.Errorf("couldn't delete comment: %w", err)
-	}
-
-	return nil
+	return s.repo.DeleteComment(commentID)
 }

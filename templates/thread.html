@@ -243,11 +243,13 @@
     <h1 class="thread-title">{{.Thread.Title}}</h1>
     
     <script>
-        window.userId = {{.user_id}};
-        window.threadAuthorId = {{.Thread.AuthorID}};
+        window.userId = {{if .user_id}}{{.user_id}}{{else}}null{{end}};
+        window.userRole = "{{.user_role}}";
+        console.log('Debug - User ID:', window.userId);
+        console.log('Debug - User Role:', window.userRole);
     </script>
     
-    {{if eq .Thread.AuthorID .user_id}}
+    {{if or (eq .Thread.AuthorID .user_id) (eq .user_role "admin")}}
     <button class="btn btn-primary add-post-btn" onclick="showCreatePostModal()">Добавить пост</button>
     {{end}}
     
@@ -327,9 +329,14 @@
         // Функция для загрузки постов
         function loadThreadPosts() {
             const threadId = window.location.pathname.split('/')[2];
+            console.log('Debug - Loading posts for thread:', threadId);
             fetch(`/api/threads/${threadId}/posts`)
-                .then(response => response.json())
+                .then(response => {
+                    console.log('Debug - API Response status:', response.status);
+                    return response.json();
+                })
                 .then(data => {
+                    console.log('Debug - API Response data:', data);
                     const postsContainer = document.querySelector('.thread-posts');
                     postsContainer.innerHTML = '';
                     if (!data || data.length === 0) {
@@ -341,13 +348,19 @@
                         `;
                     } else {
                         data.forEach(post => {
+                            console.log('Debug - Post:', post);
+                            console.log('Debug - Post Author ID:', post.author_id);
+                            console.log('Debug - Window User ID:', window.userId);
+                            console.log('Debug - Window User Role:', window.userRole);
+                            console.log('Debug - Can Edit:', window.userId === post.author_id || window.userRole === "admin");
+                            
                             const postElement = document.createElement('div');
                             postElement.className = 'post-card';
                             postElement.innerHTML = `
                                 <div class="card-body">
                                     <div class="post-header">
                                         <h5 class="post-title">${post.title || 'Новый пост'}</h5>
-                                        ${window.threadAuthorId === window.userId ? `
+                                        ${(window.userId === post.author_id || window.userRole === "admin") ? `
                                         <div class="post-actions">
                                             <button class="btn btn-sm btn-outline-primary edit-post" data-post-id="${post.id}">
                                                 <i class="bi bi-pencil"></i>

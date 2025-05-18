@@ -6,6 +6,7 @@ import (
 	"ForumService/internal/repository"
 	"ForumService/internal/service"
 	"database/sql"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-contrib/cors"
 	_ "github.com/lib/pq"
@@ -37,8 +38,8 @@ func main() {
 	userRepo := repository.NewUserRepository(db)
 
 	// Инициализация сервисов
-	postService := service.NewPostService(postRepo, commentRepo, threadRepo)
-	commentService := service.NewCommentService(commentRepo)
+	postService := service.NewPostService(postRepo, commentRepo, threadRepo, userRepo)
+	commentService := service.NewCommentService(commentRepo, userRepo)
 	threadService := service.NewThreadService(threadRepo, postRepo, userRepo)
 	chatService := service.NewChatService(chatRepo)
 
@@ -115,6 +116,25 @@ func main() {
 		c.Next()
 	})
 
+	// Добавляем отладочный вывод для роли пользователя
+	r.Use(func(c *gin.Context) {
+		userRole, _ := c.Get("user_role")
+		fmt.Printf("Debug - User Role in main.go: %v\n", userRole)
+		fmt.Printf("Debug - User Role type in main.go: %T\n", userRole)
+		fmt.Printf("Debug - Raw user role in main.go: %q\n", userRole)
+
+		// Проверяем, что роль является строкой
+		if roleStr, ok := userRole.(string); ok {
+			fmt.Printf("Debug - Role is string: %q\n", roleStr)
+			// Устанавливаем роль заново, чтобы убедиться, что это строка
+			c.Set("user_role", roleStr)
+		} else {
+			fmt.Printf("Debug - Role is not string: %T\n", userRole)
+		}
+
+		c.Next()
+	})
+
 	// Маршруты для тредов
 	protected.POST("/threads", threadHandler.CreateThread)
 	protected.PUT("/threads/:id", threadHandler.UpdateThread)
@@ -151,6 +171,10 @@ func main() {
 	r.GET("/threads", func(c *gin.Context) {
 		user, _ := c.Get("user")
 		userID, _ := c.Get("user_id")
+		userRole, _ := c.Get("user_role")
+		if userRole == nil {
+			userRole = "user"
+		}
 		threads, err := threadService.GetAllThreads()
 		if err != nil {
 			c.HTML(500, "error.html", gin.H{
@@ -169,6 +193,7 @@ func main() {
 			"threads": threads,
 			"user": user,
 			"user_id": userIDInt,
+			"user_role": userRole,
 		})
 	})
 
@@ -227,6 +252,7 @@ func main() {
 		// Получаем информацию о пользователе из контекста
 		user, _ := c.Get("user")
 		userID, _ := c.Get("user_id")
+		userRole, _ := c.Get("user_role")
 
 		log.Printf("Debug - User info: user=%+v, userID=%+v", user, userID)
 
@@ -253,6 +279,7 @@ func main() {
 			"comments": comments,
 			"user":     user,
 			"user_id":  userID,
+			"user_role": userRole,
 			"CanEdit":  post.CanEdit,
 		})
 	})

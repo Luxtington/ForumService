@@ -73,7 +73,13 @@ func (s *threadService) UpdateThread(thread *models.Thread, userID int) error {
 		return err
 	}
 
-	if existingThread.AuthorID != userID {
+	// Получаем роль пользователя
+	userRole, err := s.userRepo.GetUserRole(userID)
+	if err != nil {
+		return err
+	}
+
+	if existingThread.AuthorID != userID && userRole != "admin" {
 		return ErrNoPermission
 	}
 
@@ -86,7 +92,13 @@ func (s *threadService) DeleteThread(threadID int, userID int) error {
 		return err
 	}
 
-	if thread.AuthorID != userID {
+	// Получаем роль пользователя
+	userRole, err := s.userRepo.GetUserRole(userID)
+	if err != nil {
+		return err
+	}
+
+	if thread.AuthorID != userID && userRole != "admin" {
 		return ErrNoPermission
 	}
 

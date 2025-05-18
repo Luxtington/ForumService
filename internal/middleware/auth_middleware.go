@@ -53,6 +53,7 @@ func AuthServiceMiddleware(authServiceURL string) gin.HandlerFunc {
 		var user struct {
 			ID       uint   `json:"id"`
 			Username string `json:"username"`
+			Role     string `json:"role"`
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
 			c.JSON(500, gin.H{"error": "ошибка при обработке ответа"})
@@ -63,5 +64,37 @@ func AuthServiceMiddleware(authServiceURL string) gin.HandlerFunc {
 		// Сохраняем информацию о пользователе в контексте
 		c.Set("user_id", user.ID)
 		c.Set("username", user.Username)
+		c.Set("user_role", user.Role)
+		
+		// Отладочный вывод
+		fmt.Printf("Debug - User ID: %d, Username: %s, Role: %s\n", user.ID, user.Username, user.Role)
+		fmt.Printf("Debug - User Role type: %T\n", user.Role)
+		fmt.Printf("Debug - Raw user role: %q\n", user.Role)
+		
+		// Проверяем, что роль установлена в контексте
+		if role, exists := c.Get("user_role"); exists {
+			fmt.Printf("Debug - Role in context: %v (type: %T)\n", role, role)
+			fmt.Printf("Debug - Raw role in context: %q\n", role)
+			
+			// Проверяем, что роль является строкой
+			if roleStr, ok := role.(string); ok {
+				fmt.Printf("Debug - Role is string: %q\n", roleStr)
+				// Устанавливаем роль заново, чтобы убедиться, что это строка
+				c.Set("user_role", roleStr)
+			} else {
+				fmt.Printf("Debug - Role is not string: %T\n", role)
+			}
+		} else {
+			fmt.Printf("Debug - Role not found in context\n")
+		}
+
+		// Проверяем, что ID установлен в контексте
+		if id, exists := c.Get("user_id"); exists {
+			fmt.Printf("Debug - User ID in context: %v (type: %T)\n", id, id)
+		} else {
+			fmt.Printf("Debug - User ID not found in context\n")
+		}
+
+		c.Next()
 	}
 } 

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"ForumService/internal/models"
 	"ForumService/internal/service"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -95,11 +94,25 @@ func (h *ThreadHandler) DeleteThread(c *gin.Context) {
 	}
 	userIDInt := int(userID.(uint))
 
-	if err := h.service.DeleteThread(id, userIDInt); err != nil {
-		if err == service.ErrNoPermission {
+	// Получаем роль пользователя
+	userRole, _ := c.Get("user_role")
+	if userRole == nil {
+		userRole = "user"
+	}
+
+	// Проверяем, является ли пользователь автором треда или администратором
+	thread, _, err := h.service.GetThreadWithPosts(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при получении треда"})
+		return
+	}
+
+	if thread.AuthorID != userIDInt && userRole != "admin" {
 			c.JSON(http.StatusForbidden, gin.H{"error": "no permission to delete this thread"})
 			return
 		}
+
+	if err := h.service.DeleteThread(id, userIDInt); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -121,22 +134,32 @@ func (h *ThreadHandler) UpdateThread(c *gin.Context) {
 	}
 	userIDInt := int(userID.(uint))
 
+	// Получаем роль пользователя
+	userRole, _ := c.Get("user_role")
+	if userRole == nil {
+		userRole = "user"
+	}
+
 	var req UpdateThreadRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	thread := &models.Thread{
-		ID:    id,
-		Title: req.Title,
+	// Проверяем, является ли пользователь автором треда или администратором
+	thread, _, err := h.service.GetThreadWithPosts(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при получении треда"})
+		return
 	}
 
-	if err := h.service.UpdateThread(thread, userIDInt); err != nil {
-		if err == service.ErrNoPermission {
+	if thread.AuthorID != userIDInt && userRole != "admin" {
 			c.JSON(http.StatusForbidden, gin.H{"error": "no permission to update this thread"})
 			return
 		}
+
+	thread.Title = req.Title
+	if err := h.service.UpdateThread(thread, userIDInt); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

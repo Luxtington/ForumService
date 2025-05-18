@@ -48,6 +48,13 @@ function deleteThread(id) {
 // Функция для добавления нового треда в список
 function addThreadToList(thread) {
     console.log('Добавление треда в список:', thread);
+    console.log('Debug - Thread Author ID:', thread.author_id);
+    console.log('Debug - Window User ID:', window.userId);
+    console.log('Debug - Window User Role:', window.userRole);
+    console.log('Debug - Is Author:', thread.author_id === window.userId);
+    console.log('Debug - Is Admin:', window.userRole === "admin");
+    console.log('Debug - Should Show Buttons:', thread.author_id === window.userId || window.userRole === "admin");
+
     if (!thread || !thread.id) {
         console.error('Некорректный тред:', thread);
         return;
@@ -72,7 +79,7 @@ function addThreadToList(thread) {
                 <h5 class="card-title mb-0">
                     <a href="/threads/${thread.id}" class="text-decoration-none">${thread.title || ''}</a>
                 </h5>
-                ${thread.author_id === window.userId ? `
+                ${(thread.author_id === window.userId || window.userRole === "admin") ? `
                 <div class="btn-group">
                     <button type="button" class="btn btn-outline-primary btn-sm" onclick="editThread(${thread.id}, '${thread.title || ''}')">
                         <i class="bi bi-pencil"></i>
@@ -92,9 +99,7 @@ function addThreadToList(thread) {
     `;
     console.log('HTML для треда:', html);
     threadCard.innerHTML = html;
-    
-    threadList.insertBefore(threadCard, threadList.firstChild);
-    console.log('Тред добавлен в список');
+    threadList.appendChild(threadCard);
 }
 
 // Обработчик формы редактирования

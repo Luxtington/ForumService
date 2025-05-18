@@ -7,4 +7,5 @@ type ChatMessage struct {
     AuthorID  int       `json:"author_id"`
     Content   string    `json:"content"`
     CreatedAt time.Time `json:"created_at"`
+    AuthorName string   `json:"author_name"`
 } 

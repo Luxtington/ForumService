@@ -11,6 +11,7 @@ import (
 	"github.com/gin-contrib/cors"
 	_ "github.com/lib/pq"
 	"log"
+	_"net/http"
 	"strconv"
 	_"strings"
 	"time"
@@ -160,6 +161,7 @@ func main() {
 		user, _ := c.Get("user")
 		userID, _ := c.Get("user_id")
 		userRole, _ := c.Get("user_role")
+		username, _ := c.Get("username")
 		if userRole == nil {
 			userRole = "user"
 		}
@@ -188,6 +190,7 @@ func main() {
 			"user":      user,
 			"user_id":   userIDInt,
 			"user_role": userRole,
+			"username": username,
 			"Threads":   threads,
 		})
 	})
@@ -197,6 +200,7 @@ func main() {
 		user, _ := c.Get("user")
 		userID, _ := c.Get("user_id")
 		userRole, _ := c.Get("user_role")
+		username, _ := c.Get("username")
 		if userRole == nil {
 			userRole = "user"
 		}
@@ -225,6 +229,7 @@ func main() {
 			"user":      user,
 			"user_id":   userIDInt,
 			"user_role": userRole,
+			"username": username,
 		})
 	})
 
@@ -233,6 +238,7 @@ func main() {
 		user, _ := c.Get("user")
 		userID, _ := c.Get("user_id")
 		userRole, _ := c.Get("user_role")
+		username, _ := c.Get("username")
 		if userRole == nil {
 			userRole = "user"
 		}
@@ -270,6 +276,7 @@ func main() {
 			"user":      user,
 			"user_id":   userIDInt,
 			"user_role": userRole,
+			"username": username,
 		})
 	})
 
@@ -296,6 +303,7 @@ func main() {
 		user, _ := c.Get("user")
 		userID, _ := c.Get("user_id")
 		userRole, _ := c.Get("user_role")
+		username, _ := c.Get("username")
 
 		log.Printf("Debug - User info: user=%+v, userID=%+v", user, userID)
 
@@ -323,6 +331,7 @@ func main() {
 			"user":     user,
 			"user_id":  userID,
 			"user_role": userRole,
+			"username": username,
 			"CanEdit":  post.CanEdit,
 		})
 	})

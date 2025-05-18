@@ -50,7 +50,11 @@ func (r *chatRepository) CreateMessage(authorID int, content string) (*models.Ch
 }
 
 func (r *chatRepository) GetAllMessages() ([]*models.ChatMessage, error) {
-	query := `SELECT id, author_id, content, created_at FROM chat_messages ORDER BY created_at DESC`
+	query := `
+		SELECT cm.id, cm.author_id, cm.content, cm.created_at, u.username as author_name 
+		FROM chat_messages cm
+		LEFT JOIN users u ON cm.author_id = u.id 
+		ORDER BY cm.created_at DESC`
 	
 	rows, err := r.db.Query(query)
 	if err != nil {
@@ -66,6 +70,7 @@ func (r *chatRepository) GetAllMessages() ([]*models.ChatMessage, error) {
 			&message.AuthorID,
 			&message.Content,
 			&message.CreatedAt,
+			&message.AuthorName,
 		)
 		if err != nil {
 			return nil, err

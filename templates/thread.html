@@ -2,6 +2,8 @@
 <html>
 <head>
     <title>Тред {{.Thread.Title}}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -237,9 +239,39 @@
             white-space: pre-wrap;
             word-break: break-word;
         }
+        .current-user {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #f8f9fa;
+            padding: 10px 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        .current-user i {
+            margin-right: 5px;
+            color: #0d6efd;
+        }
     </style>
 </head>
 <body>
+    <nav class="navbar navbar-expand-lg navbar-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-chat-square-text me-2"></i>Форум
+            </a>
+            <a href="/" class="btn btn-primary">
+                <i class="bi bi-arrow-left"></i> Назад на главную
+            </a>
+        </div>
+    </nav>
+
+    <div class="current-user">
+        <i class="bi bi-person-circle"></i>
+        <span id="currentUsername">{{.username}}</span>
+    </div>
+
     <h1 class="thread-title">
         {{.Thread.Title}}
         {{if or (eq .Thread.AuthorID .user_id) (eq .user_role "admin")}}

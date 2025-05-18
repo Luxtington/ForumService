@@ -39,7 +39,7 @@ function addMessageToChat(message) {
     messageDiv.className = 'chat-message';
     const html = `
         <div class="chat-message-meta">
-            <i class="bi bi-person-circle"></i> ID: ${message.author_id || ''} • ${formatDate(message.created_at)}
+            <i class="bi bi-person-circle"></i> ${message.author_name || 'Аноним'} • ${formatDate(message.created_at)}
         </div>
         <div class="chat-message-content">
             ${message.content || ''}

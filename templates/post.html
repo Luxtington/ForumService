@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>Пост #{{.post.ID}}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
     <style>
         body {
@@ -102,9 +103,28 @@
             from { opacity: 0; }
             to { opacity: 1; }
         }
+        .current-user {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #f8f9fa;
+            padding: 10px 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        .current-user i {
+            margin-right: 5px;
+            color: #0d6efd;
+        }
     </style>
 </head>
 <body>
+    <div class="current-user">
+        <i class="bi bi-person-circle"></i>
+        <span id="currentUsername">{{.username}}</span>
+    </div>
+
     <a href="/threads/{{.post.ThreadID}}" class="back-link">← Назад к треду</a>
 
     <div class="post">
@@ -115,7 +135,7 @@
             {{end}}
             {{if or (eq .post.AuthorID .user_id) (eq .user_role "admin")}}
             <div class="post-actions">
-                <button class="btn btn-sm btn-outline-primary edit-post" data-post-id="{{.post.ID}}">
+                <button class="btn btn-sm btn-outline-primary edit-post" data-post-id="{{.post.ID}}" data-bs-toggle="modal" data-bs-target="#editPostModal">
                     <i class="bi bi-pencil"></i> Редактировать
                 </button>
                 <button class="btn btn-sm btn-outline-danger delete-post" data-post-id="{{.post.ID}}">
@@ -126,6 +146,31 @@
         </div>
         <div class="post-content">
             {{.post.Content}}
+        </div>
+    </div>
+
+    <!-- Модальное окно для редактирования поста -->
+    <div class="modal fade" id="editPostModal" tabindex="-1" aria-labelledby="editPostModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editPostModalLabel">Редактирование поста</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editPostForm">
+                        <input type="hidden" id="editPostId" name="post_id">
+                        <div class="mb-3">
+                            <label for="editPostContent" class="form-label">Содержание поста</label>
+                            <textarea class="form-control" id="editPostContent" name="content" rows="5" required></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" id="savePostEdit">Сохранить</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -188,6 +233,7 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Отладочная информация в HTML
         console.log('Template values:');
@@ -203,6 +249,91 @@
         console.log('User Role:', userRole, typeof userRole);
         console.log('Raw user role:', userRole);
         console.log('Is Admin:', userRole === "admin");
+
+        // Функция для получения токена из куки
+        function getToken() {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'auth_token') {
+                    return value;
+                }
+            }
+            return null;
+        }
+
+        // Обработчик редактирования поста
+        document.querySelector('.edit-post')?.addEventListener('click', function(e) {
+            e.preventDefault();
+            const postId = this.dataset.postId;
+            const postContent = document.querySelector('.post-content').textContent.trim();
+            
+            // Заполняем форму редактирования
+            document.getElementById('editPostId').value = postId;
+            document.getElementById('editPostContent').value = postContent;
+            
+            // Показываем модальное окно
+            const modal = new bootstrap.Modal(document.getElementById('editPostModal'));
+            modal.show();
+        });
+
+        // Обработчик сохранения редактирования поста
+        document.getElementById('savePostEdit')?.addEventListener('click', async function() {
+            const postId = document.getElementById('editPostId').value;
+            const newContent = document.getElementById('editPostContent').value.trim();
+            
+            if (newContent) {
+                try {
+                    const response = await fetch(`/api/posts/${postId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${getToken()}`
+                        },
+                        body: JSON.stringify({
+                            content: newContent
+                        })
+                    });
+
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        const error = await response.json();
+                        alert(error.error || 'Ошибка при редактировании поста');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Ошибка при редактировании поста');
+                }
+            }
+        });
+
+        // Обработчик удаления поста
+        document.querySelector('.delete-post')?.addEventListener('click', async function(e) {
+            e.preventDefault();
+            const postId = this.dataset.postId;
+            
+            if (confirm('Вы уверены, что хотите удалить этот пост? Это действие нельзя отменить.')) {
+                try {
+                    const response = await fetch(`/api/posts/${postId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': `Bearer ${getToken()}`
+                        }
+                    });
+
+                    if (response.ok) {
+                        window.location.href = '/threads/{{ .post.ThreadID }}';
+                    } else {
+                        const error = await response.json();
+                        alert(error.error || 'Ошибка при удалении поста');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Ошибка при удалении поста');
+                }
+            }
+        });
 
         // Обработчик формы создания комментария
         document.getElementById('commentForm')?.addEventListener('submit', async function(e) {
@@ -304,18 +435,6 @@
                 }
             }
         });
-
-        // Функция для получения токена из куки
-        function getToken() {
-            const cookies = document.cookie.split(';');
-            for (let cookie of cookies) {
-                const [name, value] = cookie.trim().split('=');
-                if (name === 'auth_token') {
-                    return value;
-                }
-            }
-            return null;
-        }
     </script>
 </body>
 </html>

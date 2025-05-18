@@ -18,7 +18,12 @@ func NewPostRepository(db *sql.DB) PostRepository {
 }
 
 func (r *postRepository) GetByThreadID(threadID int) ([]*models.Post, error) {
-	query := `SELECT id, thread_id, author_id, content, created_at, updated_at FROM posts WHERE thread_id = $1 ORDER BY created_at ASC`
+	query := `
+		SELECT p.id, p.thread_id, p.author_id, p.content, p.created_at, p.updated_at, u.username as author_name 
+		FROM posts p
+		LEFT JOIN users u ON p.author_id = u.id
+		WHERE p.thread_id = $1 
+		ORDER BY p.created_at ASC`
 	rows, err := r.db.Query(query, threadID)
 	if err != nil {
 		return nil, err
@@ -35,6 +40,7 @@ func (r *postRepository) GetByThreadID(threadID int) ([]*models.Post, error) {
 			&post.Content,
 			&post.CreatedAt,
 			&post.UpdatedAt,
+			&post.AuthorName,
 		)
 		if err != nil {
 			return nil, err
@@ -91,9 +97,10 @@ func (r *postRepository) SavePost(post *models.Post) error {
 
 func (r *postRepository) GetPostByID(id int) (*models.Post, error) {
 	query := `
-		SELECT id, thread_id, author_id, content, created_at, updated_at
-		FROM posts
-		WHERE id = $1`
+		SELECT p.id, p.thread_id, p.author_id, p.content, p.created_at, p.updated_at, u.username as author_name
+		FROM posts p
+		LEFT JOIN users u ON p.author_id = u.id
+		WHERE p.id = $1`
 
 	post := &models.Post{}
 	err := r.db.QueryRow(query, id).Scan(
@@ -103,6 +110,7 @@ func (r *postRepository) GetPostByID(id int) (*models.Post, error) {
 		&post.Content,
 		&post.CreatedAt,
 		&post.UpdatedAt,
+		&post.AuthorName,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {

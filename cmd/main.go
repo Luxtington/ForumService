@@ -1,6 +1,7 @@
 package main
 
 import (
+	"ForumService/internal/client"
 	"ForumService/internal/handlers"
 	"ForumService/internal/middleware"
 	"ForumService/internal/repository"
@@ -38,6 +39,12 @@ func main() {
 	// Проверка подключения
 	if err := db.Ping(); err != nil {
 		log.Fatalf("Failed to ping database: %v", err)
+	}
+
+	// Инициализация gRPC клиента для аутентификации
+	authClient, err := client.NewAuthClient("localhost:50051")
+	if err != nil {
+		log.Fatalf("Failed to create auth client: %v", err)
 	}
 
 	// Инициализация репозиториев
@@ -78,7 +85,7 @@ func main() {
 	r.Static("/static", "./static")
 
 	// Инициализация middleware для аутентификации
-	authMiddleware := middleware.AuthServiceMiddleware("http://localhost:8082")
+	authMiddleware := middleware.AuthServiceMiddleware(authClient)
 
 	// Инициализация Hub для веб-сокетов
 	hub := handlers.NewHub(chatRepo)
@@ -86,77 +93,20 @@ func main() {
 
 	// Группа защищенных маршрутов
 	protected := r.Group("/api")
-	protected.Use(func(c *gin.Context) {
-		// Проверяем токен в заголовке Authorization
-		authHeader := c.GetHeader("Authorization")
-		if authHeader != "" {
-			authMiddleware(c)
-			return
-		}
-
-		// Проверяем токен в куках
-		token, err := c.Cookie("auth_token")
-		if err == nil && token != "" {
-			// Если токен есть в куках, добавляем его в заголовок
-			c.Request.Header.Set("Authorization", "Bearer "+token)
-			authMiddleware(c)
-			return
-		}
-
-		// Если нет токена, возвращаем 401
-		c.JSON(401, gin.H{"error": "требуется аутентификация"})
-		c.Abort()
-	})
-
-	// Публичные маршруты
-	r.Use(func(c *gin.Context) {
-		// Проверяем токен в заголовке Authorization
-		authHeader := c.GetHeader("Authorization")
-		if authHeader != "" {
-			authMiddleware(c)
-			return
-		}
-
-		// Проверяем токен в куках
-		token, err := c.Cookie("auth_token")
-		if err == nil && token != "" {
-			// Если токен есть в куках, добавляем его в заголовок
-			c.Request.Header.Set("Authorization", "Bearer "+token)
-			authMiddleware(c)
-			return
-		}
-
-		// Если нет токена, продолжаем без аутентификации
-		c.Next()
-	})
-
-	// Добавляем отладочный вывод для роли пользователя
-	r.Use(func(c *gin.Context) {
-		userRole, _ := c.Get("user_role")
-		fmt.Printf("Debug - User Role in main.go: %v\n", userRole)
-		fmt.Printf("Debug - User Role type in main.go: %T\n", userRole)
-		fmt.Printf("Debug - Raw user role in main.go: %q\n", userRole)
-
-		// Проверяем, что роль является строкой
-		if roleStr, ok := userRole.(string); ok {
-			fmt.Printf("Debug - Role is string: %q\n", roleStr)
-			// Устанавливаем роль заново, чтобы убедиться, что это строка
-			c.Set("user_role", roleStr)
-		} else {
-			fmt.Printf("Debug - Role is not string: %T\n", userRole)
-		}
-
-		c.Next()
-	})
+	protected.Use(authMiddleware)
 
 	// Маршруты для тредов
+	protected.GET("/threads", threadHandler.GetAllThreads)
+	protected.GET("/threads/:id", threadHandler.GetThreadWithPosts)
+	protected.GET("/threads/:id/posts", threadHandler.GetThreadPosts)
 	protected.POST("/threads", threadHandler.CreateThread)
 	protected.PUT("/threads/:id", threadHandler.UpdateThread)
 	protected.DELETE("/threads/:id", threadHandler.DeleteThread)
-	protected.GET("/threads/:id/posts", threadHandler.GetThreadPosts)
-	protected.GET("/threads", threadHandler.GetAllThreads)
 
 	// Маршруты для постов
+	protected.GET("/posts", postHandler.GetAllPosts)
+	protected.GET("/posts/:id", postHandler.GetPost)
+	protected.GET("/posts/:id/comments", postHandler.GetPostComments)
 	protected.POST("/posts", postHandler.CreatePost)
 	protected.PUT("/posts/:id", postHandler.UpdatePost)
 	protected.DELETE("/posts/:id", postHandler.DeletePost)
@@ -220,17 +170,13 @@ func main() {
 			Conn:     conn,
 			Send:     make(chan []byte, 256),
 			Username: username.(string),
-			UserID:   int(userID.(uint)),
+			UserID:   int(userID.(uint32)),
 		}
 
-		// Регистрируем клиента в хабе
 		hub.Register <- client
 
-		// Запускаем горутины для чтения и записи
 		go hub.WritePump(client)
 		go hub.ReadPump(client)
-
-		log.Printf("WebSocket соединение установлено для пользователя ID: %v", userID)
 	})
 
 	// Главная страница со списком тредов

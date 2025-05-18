@@ -1,15 +1,14 @@
 package middleware
 
 import (
-	"encoding/json"
-	"fmt"
+	"ForumService/internal/client"
 	"github.com/gin-gonic/gin"
-	"net/http"
 	"strings"
+	"fmt"
 )
 
 // AuthServiceMiddleware проверяет JWT токен через AuthService
-func AuthServiceMiddleware(authServiceURL string) gin.HandlerFunc {
+func AuthServiceMiddleware(authClient *client.AuthClient) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Получаем токен из заголовка Authorization
 		authHeader := c.GetHeader("Authorization")
@@ -22,54 +21,23 @@ func AuthServiceMiddleware(authServiceURL string) gin.HandlerFunc {
 		// Убираем префикс "Bearer " если он есть
 		token := strings.TrimPrefix(authHeader, "Bearer ")
 
-		// Создаем запрос к AuthService
-		req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/auth/validate", authServiceURL), nil)
+		// Проверяем токен через gRPC клиент
+		userID, username, role, err := authClient.ValidateToken(token)
 		if err != nil {
-			c.JSON(500, gin.H{"error": "ошибка при создании запроса"})
-			c.Abort()
-			return
-		}
-
-		// Добавляем токен в заголовок
-		req.Header.Set("Authorization", "Bearer "+token)
-
-		// Выполняем запрос
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			c.JSON(500, gin.H{"error": "ошибка при проверке токена"})
-			c.Abort()
-			return
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
 			c.JSON(401, gin.H{"error": "недействительный токен"})
 			c.Abort()
 			return
 		}
 
-		// Декодируем ответ
-		var user struct {
-			ID       uint   `json:"id"`
-			Username string `json:"username"`
-			Role     string `json:"role"`
-		}
-		if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
-			c.JSON(500, gin.H{"error": "ошибка при обработке ответа"})
-			c.Abort()
-			return
-		}
-
 		// Сохраняем информацию о пользователе в контексте
-		c.Set("user_id", user.ID)
-		c.Set("username", user.Username)
-		c.Set("user_role", user.Role)
+		c.Set("user_id", userID)
+		c.Set("username", username)
+		c.Set("user_role", role)
 		
 		// Отладочный вывод
-		fmt.Printf("Debug - User ID: %d, Username: %s, Role: %s\n", user.ID, user.Username, user.Role)
-		fmt.Printf("Debug - User Role type: %T\n", user.Role)
-		fmt.Printf("Debug - Raw user role: %q\n", user.Role)
+		fmt.Printf("Debug - User ID: %d, Username: %s, Role: %s\n", userID, username, role)
+		fmt.Printf("Debug - User Role type: %T\n", role)
+		fmt.Printf("Debug - Raw user role: %q\n", role)
 		
 		// Проверяем, что роль установлена в контексте
 		if role, exists := c.Get("user_role"); exists {

@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package forum;
+
+option go_package = "ForumService/proto";
+
+service ForumService {
+  rpc CreateThread(CreateThreadRequest) returns (ThreadResponse) {}
+  rpc GetThread(GetThreadRequest) returns (ThreadResponse) {}
+  rpc CreatePost(CreatePostRequest) returns (PostResponse) {}
+  rpc GetPost(GetPostRequest) returns (PostResponse) {}
+  rpc CreateComment(CreateCommentRequest) returns (CommentResponse) {}
+  rpc GetComments(GetCommentsRequest) returns (CommentsResponse) {}
+  rpc CreateChatMessage(CreateChatMessageRequest) returns (ChatMessageResponse) {}
+  rpc GetChatMessages(GetChatMessagesRequest) returns (ChatMessagesResponse) {}
+}
+
+message CreateThreadRequest {
+  string title = 1;
+  uint32 author_id = 2;
+}
+
+message GetThreadRequest {
+  uint32 thread_id = 1;
+}
+
+message ThreadResponse {
+  uint32 id = 1;
+  string title = 2;
+  uint32 author_id = 3;
+  string created_at = 4;
+  repeated PostResponse posts = 5;
+}
+
+message CreatePostRequest {
+  uint32 thread_id = 1;
+  string content = 2;
+  uint32 author_id = 3;
+}
+
+message GetPostRequest {
+  uint32 post_id = 1;
+}
+
+message PostResponse {
+  uint32 id = 1;
+  uint32 thread_id = 2;
+  string content = 3;
+  uint32 author_id = 4;
+  string created_at = 5;
+  repeated CommentResponse comments = 6;
+}
+
+message CreateCommentRequest {
+  uint32 post_id = 1;
+  string content = 2;
+  uint32 author_id = 3;
+}
+
+message GetCommentsRequest {
+  uint32 post_id = 1;
+}
+
+message CommentResponse {
+  uint32 id = 1;
+  uint32 post_id = 2;
+  string content = 3;
+  uint32 author_id = 4;
+  string created_at = 5;
+}
+
+message CommentsResponse {
+  repeated CommentResponse comments = 1;
+}
+
+message CreateChatMessageRequest {
+  string content = 1;
+  uint32 author_id = 2;
+}
+
+message GetChatMessagesRequest {}
+
+message ChatMessageResponse {
+  uint32 id = 1;
+  string content = 2;
+  uint32 author_id = 3;
+  string author_name = 4;
+  string created_at = 5;
+}
+
+message ChatMessagesResponse {
+  repeated ChatMessageResponse messages = 1;
+} 

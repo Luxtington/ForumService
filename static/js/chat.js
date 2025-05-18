@@ -1,4 +1,3 @@
-{{define "chat.js"}}
 // Функция для форматирования даты
 function formatDate(dateString) {
     console.log('Форматирование даты:', dateString);
@@ -44,6 +43,8 @@ function initWebSocket() {
     
     ws.onopen = function() {
         console.log('WebSocket соединение установлено');
+        console.log('WebSocket протокол:', ws.protocol);
+        console.log('WebSocket readyState:', ws.readyState);
         reconnectAttempts = 0;
         isConnecting = false;
     };
@@ -64,22 +65,22 @@ function initWebSocket() {
     };
     
     ws.onclose = function(event) {
-        console.log('WebSocket соединение закрыто:', event.code, event.reason);
+        console.log('WebSocket соединение закрыто:', event.code);
+        console.log('WebSocket wasClean:', event.wasClean);
         isConnecting = false;
         
         if (reconnectAttempts < maxReconnectAttempts) {
+            console.log(`Попытка переподключения ${reconnectAttempts + 1}/${maxReconnectAttempts}...`);
             reconnectAttempts++;
-            console.log(`Попытка переподключения ${reconnectAttempts} из ${maxReconnectAttempts} через ${reconnectDelay/1000} секунд...`);
             setTimeout(initWebSocket, reconnectDelay);
         } else {
-            console.error('Достигнуто максимальное количество попыток переподключения');
-            alert('Не удалось установить соединение с сервером. Пожалуйста, обновите страницу.');
+            console.log('Достигнуто максимальное количество попыток переподключения');
         }
     };
     
     ws.onerror = function(error) {
-        console.error('WebSocket ошибка:', error);
-        isConnecting = false;
+        console.log('WebSocket ошибка:', error);
+        console.log('WebSocket readyState при ошибке:', ws.readyState);
     };
 }
 
@@ -204,5 +205,4 @@ document.addEventListener('DOMContentLoaded', () => {
     loadChatMessages();
     initWebSocket();
     scrollChatToBottom();
-});
-{{end}} 
+}); 

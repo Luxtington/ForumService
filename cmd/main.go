@@ -11,11 +11,20 @@ import (
 	"github.com/gin-contrib/cors"
 	_ "github.com/lib/pq"
 	"log"
-	_"net/http"
+	"net/http"
 	"strconv"
-	_"strings"
 	"time"
+	"github.com/gorilla/websocket"
 )
+
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
+	Subprotocols: []string{"chat"},
+}
 
 func main() {
 	// Подключение к базе данных
@@ -70,6 +79,10 @@ func main() {
 
 	// Инициализация middleware для аутентификации
 	authMiddleware := middleware.AuthServiceMiddleware("http://localhost:8082")
+
+	// Инициализация Hub для веб-сокетов
+	hub := handlers.NewHub(chatRepo)
+	go hub.Run()
 
 	// Группа защищенных маршрутов
 	protected := r.Group("/api")
@@ -155,6 +168,70 @@ func main() {
 	// Маршруты для чата
 	protected.POST("/chat", chatHandler.CreateMessage)
 	protected.GET("/chat", chatHandler.GetMessages)
+
+	// WebSocket маршрут (публичный)
+	r.GET("/ws", func(c *gin.Context) {
+		log.Printf("Получен запрос на WebSocket соединение")
+		
+		// Проверяем токен в куках
+		token, err := c.Cookie("auth_token")
+		if err != nil {
+			log.Printf("Ошибка получения токена из куки: %v", err)
+			return
+		}
+
+		if token == "" {
+			log.Printf("Пустой токен в куки")
+			return
+		}
+
+		log.Printf("Токен получен успешно")
+		
+		// Добавляем токен в заголовок
+		c.Request.Header.Set("Authorization", "Bearer "+token)
+		
+		// Вызываем middleware для установки контекста
+		authMiddleware(c)
+		
+		if c.IsAborted() {
+			log.Printf("Middleware прервал запрос")
+			return
+		}
+
+		// Проверяем, что пользователь аутентифицирован
+		userID, exists := c.Get("user_id")
+		if !exists || userID == nil {
+			log.Printf("Пользователь не аутентифицирован")
+			return
+		}
+
+		username, _ := c.Get("username")
+		log.Printf("WebSocket соединение устанавливается для пользователя ID: %v, username: %v", userID, username)
+
+		// Обновляем соединение до WebSocket
+		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+		if err != nil {
+			log.Printf("Ошибка при обновлении соединения до WebSocket: %v", err)
+			return
+		}
+
+		// Создаем нового клиента
+		client := &handlers.Client{
+			Conn:     conn,
+			Send:     make(chan []byte, 256),
+			Username: username.(string),
+			UserID:   int(userID.(uint)),
+		}
+
+		// Регистрируем клиента в хабе
+		hub.Register <- client
+
+		// Запускаем горутины для чтения и записи
+		go hub.WritePump(client)
+		go hub.ReadPump(client)
+
+		log.Printf("WebSocket соединение установлено для пользователя ID: %v", userID)
+	})
 
 	// Главная страница со списком тредов
 	r.GET("/", func(c *gin.Context) {

@@ -124,12 +124,35 @@ func (h *ViewsHandler) ShowThread(c *gin.Context) {
 	fmt.Printf("Тред найден: %+v\n", thread)
 	fmt.Printf("Количество постов: %d\n", len(posts))
 
-	userRole, _ := c.Get("user_role")
-	if userRole == nil {
+	// Получаем роль пользователя из контекста
+	userRole, exists := c.Get("user_role")
+	if !exists {
+		fmt.Printf("Debug - Role not found in context, setting default\n")
+		userRole = "user"
+	}
+	fmt.Printf("Debug - User Role in ShowThread: %v (type: %T)\n", userRole, userRole)
+	fmt.Printf("Debug - Raw user role in ShowThread: %q\n", userRole)
+
+	// Проверяем, что роль является строкой
+	if roleStr, ok := userRole.(string); ok {
+		fmt.Printf("Debug - Role is string: %q\n", roleStr)
+		userRole = roleStr
+	} else {
+		fmt.Printf("Debug - Role is not string: %T\n", userRole)
 		userRole = "user"
 	}
 
-	userID, _ := c.Get("user_id")
+	// Получаем ID пользователя из контекста
+	userID, exists := c.Get("user_id")
+	if !exists {
+		fmt.Printf("Debug - User ID not found in context\n")
+		userID = 0
+	}
+	fmt.Printf("Debug - User ID in ShowThread: %v (type: %T)\n", userID, userID)
+
+	// Отправляем данные в шаблон
+	fmt.Printf("Отправка данных в шаблон: thread=%+v, posts=%+v, user_role=%v, user_id=%v\n", 
+		thread, posts, userRole, userID)
 
 	c.HTML(http.StatusOK, "thread.html", gin.H{
 		"Thread":    thread,

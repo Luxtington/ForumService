@@ -240,7 +240,102 @@
     </style>
 </head>
 <body>
-    <h1 class="thread-title">{{.Thread.Title}}</h1>
+    <h1 class="thread-title">
+        {{.Thread.Title}}
+        {{if or (eq .Thread.AuthorID .user_id) (eq .user_role "admin")}}
+        <div class="thread-actions" style="display: inline-block; margin-left: 15px;">
+            <button class="btn btn-sm btn-outline-primary edit-thread" data-thread-id="{{.Thread.ID}}">
+                <i class="bi bi-pencil"></i> Редактировать
+            </button>
+            <button class="btn btn-sm btn-outline-danger delete-thread" data-thread-id="{{.Thread.ID}}">
+                <i class="bi bi-trash"></i> Удалить
+            </button>
+        </div>
+        {{end}}
+    </h1>
+    
+    <script>
+        // Отладочная информация
+        console.log('Debug - Thread Author ID:', {{.Thread.AuthorID}});
+        console.log('Debug - Window User ID:', {{if .user_id}}{{.user_id}}{{else}}null{{end}});
+        console.log('Debug - Window User Role:', "{{.user_role}}");
+        console.log('Debug - Is Author:', {{.Thread.AuthorID}} === {{if .user_id}}{{.user_id}}{{else}}null{{end}});
+        console.log('Debug - Is Admin:', "{{.user_role}}" === "admin");
+        console.log('Debug - Should Show Buttons:', {{.Thread.AuthorID}} === {{if .user_id}}{{.user_id}}{{else}}null{{end}} || "{{.user_role}}" === "admin");
+
+        // Инициализация переменных из шаблона
+        window.userId = {{if .user_id}}{{.user_id}}{{else}}null{{end}};
+        window.userRole = "{{.user_role}}";
+
+        // Обработчик редактирования треда
+        document.querySelector('.edit-thread')?.addEventListener('click', async function() {
+            const threadId = this.dataset.threadId;
+            const newTitle = prompt('Введите новое название треда:', '{{.Thread.Title}}');
+            
+            if (newTitle && newTitle.trim() !== '') {
+                try {
+                    const response = await fetch(`/api/threads/${threadId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${getToken()}`
+                        },
+                        body: JSON.stringify({
+                            title: newTitle.trim()
+                        })
+                    });
+
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        const error = await response.json();
+                        alert(error.error || 'Ошибка при редактировании треда');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Ошибка при редактировании треда');
+                }
+            }
+        });
+
+        // Обработчик удаления треда
+        document.querySelector('.delete-thread')?.addEventListener('click', async function() {
+            const threadId = this.dataset.threadId;
+            
+            if (confirm('Вы уверены, что хотите удалить этот тред? Это действие нельзя отменить.')) {
+                try {
+                    const response = await fetch(`/api/threads/${threadId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': `Bearer ${getToken()}`
+                        }
+                    });
+
+                    if (response.ok) {
+                        window.location.href = '/threads';
+                    } else {
+                        const error = await response.json();
+                        alert(error.error || 'Ошибка при удалении треда');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Ошибка при удалении треда');
+                }
+            }
+        });
+
+        // Функция для получения токена из куки
+        function getToken() {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'auth_token') {
+                    return value;
+                }
+            }
+            return null;
+        }
+    </script>
     
     <script>
         window.userId = {{if .user_id}}{{.user_id}}{{else}}null{{end}};

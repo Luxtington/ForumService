@@ -5,10 +5,92 @@
     <h1>Список тредов</h1>
     
     <script>
+        // Отладочная информация
         window.userId = {{if .user_id}}{{.user_id}}{{else}}null{{end}};
         window.userRole = "{{.user_role}}";
         console.log('Debug - User ID:', window.userId);
         console.log('Debug - User Role:', window.userRole);
+        console.log('Debug - Is Admin:', window.userRole === "admin");
+
+        // Обработчик редактирования треда
+        document.querySelectorAll('.edit-thread').forEach(button => {
+            button.addEventListener('click', async function(e) {
+                e.preventDefault(); // Предотвращаем переход по ссылке
+                e.stopPropagation(); // Останавливаем всплытие события
+                
+                const threadId = this.dataset.threadId;
+                const threadTitle = this.closest('.thread-card').querySelector('.thread-title a').textContent;
+                const newTitle = prompt('Введите новое название треда:', threadTitle);
+                
+                if (newTitle && newTitle.trim() !== '') {
+                    try {
+                        const response = await fetch(`/api/threads/${threadId}`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${getToken()}`
+                            },
+                            body: JSON.stringify({
+                                title: newTitle.trim()
+                            })
+                        });
+
+                        if (response.ok) {
+                            window.location.reload();
+                        } else {
+                            const error = await response.json();
+                            alert(error.error || 'Ошибка при редактировании треда');
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        alert('Ошибка при редактировании треда');
+                    }
+                }
+            });
+        });
+
+        // Обработчик удаления треда
+        document.querySelectorAll('.delete-thread').forEach(button => {
+            button.addEventListener('click', async function(e) {
+                e.preventDefault(); // Предотвращаем переход по ссылке
+                e.stopPropagation(); // Останавливаем всплытие события
+                
+                const threadId = this.dataset.threadId;
+                
+                if (confirm('Вы уверены, что хотите удалить этот тред? Это действие нельзя отменить.')) {
+                    try {
+                        const response = await fetch(`/api/threads/${threadId}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Authorization': `Bearer ${getToken()}`
+                            }
+                        });
+
+                        if (response.ok) {
+                            window.location.reload();
+                        } else {
+                            const error = await response.json();
+                            alert(error.error || 'Ошибка при удалении треда');
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        alert('Ошибка при удалении треда');
+                    }
+                }
+            });
+        });
+
+        // Функция для получения токена из куки
+        function getToken() {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'auth_token') {
+                    return value;
+                }
+            }
+            return null;
+        }
     </script>
     
     <div class="row">
@@ -43,6 +125,41 @@
         {{end}}
     </div>
 </div>
+
+<style>
+    .thread-card {
+        position: relative;
+    }
+    .thread-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    .thread-title {
+        margin: 0;
+        flex-grow: 1;
+    }
+    .thread-actions {
+        display: flex;
+        gap: 8px;
+        margin-left: 15px;
+    }
+    .thread-meta {
+        color: #666;
+        font-size: 0.9em;
+    }
+    .thread-meta span {
+        margin-right: 15px;
+    }
+    .btn-outline-primary, .btn-outline-danger {
+        padding: 4px 8px;
+        font-size: 0.875rem;
+    }
+    .btn-outline-primary:hover, .btn-outline-danger:hover {
+        color: white;
+    }
+</style>
 {{end}}
 
 {{template "base.html" .}} 

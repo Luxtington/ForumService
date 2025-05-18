@@ -83,9 +83,13 @@ func AuthServiceMiddleware(authServiceURL string) gin.HandlerFunc {
 				c.Set("user_role", roleStr)
 			} else {
 				fmt.Printf("Debug - Role is not string: %T\n", role)
+				// Если роль не строка, устанавливаем значение по умолчанию
+				c.Set("user_role", "user")
 			}
 		} else {
 			fmt.Printf("Debug - Role not found in context\n")
+			// Если роль не найдена, устанавливаем значение по умолчанию
+			c.Set("user_role", "user")
 		}
 
 		// Проверяем, что ID установлен в контексте

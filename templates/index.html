@@ -100,6 +100,10 @@
 
     <script>
         window.userId = {{.user_id}};
+        window.userRole = "{{.user_role}}";
+        console.log('Debug - User ID:', window.userId);
+        console.log('Debug - User Role:', window.userRole);
+        console.log('Debug - Is Admin:', window.userRole === "admin");
     </script>
 
     <div class="container py-4">

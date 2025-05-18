@@ -155,15 +155,40 @@ func main() {
 	protected.POST("/chat", chatHandler.CreateMessage)
 	protected.GET("/chat", chatHandler.GetMessages)
 
-	// Публичные маршруты
 	// Главная страница со списком тредов
 	r.GET("/", func(c *gin.Context) {
 		user, _ := c.Get("user")
 		userID, _ := c.Get("user_id")
+		userRole, _ := c.Get("user_role")
+		if userRole == nil {
+			userRole = "user"
+		}
+		fmt.Printf("Debug - User Role in /: %v (type: %T)\n", userRole, userRole)
+		fmt.Printf("Debug - Raw user role in /: %q\n", userRole)
+
+		// Преобразуем userID в int для корректного сравнения
+		var userIDInt int
+		if userID != nil {
+			userIDInt = int(userID.(uint))
+		}
+
+		fmt.Printf("Debug - User ID in /: %d\n", userIDInt)
+		fmt.Printf("Debug - User Role in /: %v\n", userRole)
+
+		threads, err := threadService.GetAllThreads()
+		if err != nil {
+			c.HTML(500, "error.html", gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+
 		c.HTML(200, "index.html", gin.H{
-			"title": "Главная страница",
-			"user": user,
-			"user_id": userID,
+			"title":     "Главная страница",
+			"user":      user,
+			"user_id":   userIDInt,
+			"user_role": userRole,
+			"Threads":   threads,
 		})
 	})
 
@@ -175,6 +200,9 @@ func main() {
 		if userRole == nil {
 			userRole = "user"
 		}
+		fmt.Printf("Debug - User Role in /threads: %v (type: %T)\n", userRole, userRole)
+		fmt.Printf("Debug - Raw user role in /threads: %q\n", userRole)
+
 		threads, err := threadService.GetAllThreads()
 		if err != nil {
 			c.HTML(500, "error.html", gin.H{
@@ -189,10 +217,13 @@ func main() {
 			userIDInt = int(userID.(uint))
 		}
 
+		fmt.Printf("Debug - User ID in /threads: %d\n", userIDInt)
+		fmt.Printf("Debug - User Role in /threads: %v\n", userRole)
+
 		c.HTML(200, "threads.html", gin.H{
-			"threads": threads,
-			"user": user,
-			"user_id": userIDInt,
+			"threads":   threads,
+			"user":      user,
+			"user_id":   userIDInt,
 			"user_role": userRole,
 		})
 	})
@@ -201,6 +232,13 @@ func main() {
 	r.GET("/threads/:id", func(c *gin.Context) {
 		user, _ := c.Get("user")
 		userID, _ := c.Get("user_id")
+		userRole, _ := c.Get("user_role")
+		if userRole == nil {
+			userRole = "user"
+		}
+		fmt.Printf("Debug - User Role in /threads/:id: %v (type: %T)\n", userRole, userRole)
+		fmt.Printf("Debug - Raw user role in /threads/:id: %q\n", userRole)
+
 		id, err := strconv.Atoi(c.Param("id"))
 		if err != nil {
 			c.HTML(400, "bad_request.html", gin.H{
@@ -222,11 +260,16 @@ func main() {
 			userIDInt = int(userID.(uint))
 		}
 
+		fmt.Printf("Debug - Thread Author ID: %d\n", thread.AuthorID)
+		fmt.Printf("Debug - User ID: %d\n", userIDInt)
+		fmt.Printf("Debug - User Role: %v\n", userRole)
+
 		c.HTML(200, "thread.html", gin.H{
-			"Thread": thread,
-			"posts":  posts,
-			"user": user,
-			"user_id": userIDInt,
+			"Thread":    thread,
+			"posts":     posts,
+			"user":      user,
+			"user_id":   userIDInt,
+			"user_role": userRole,
 		})
 	})
 

@@ -6,16 +6,21 @@ import (
 	"ForumService/internal/middleware"
 	"ForumService/internal/repository"
 	"ForumService/internal/service"
+	_"context"
 	"database/sql"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"github.com/gin-contrib/cors"
-	_ "github.com/lib/pq"
-	"log"
+	"github.com/gin-gonic/gin"
+	"github.com/Luxtington/Shared/logger"
 	"net/http"
 	"strconv"
-	"time"
+	_"time"
 	"github.com/gorilla/websocket"
+	_"github.com/golang/protobuf/proto"
+	_"github.com/golang/protobuf/ptypes/empty"
+	_"google.golang.org/grpc"
+	"go.uber.org/zap"
+	"context"
 )
 
 var upgrader = websocket.Upgrader{
@@ -28,23 +33,26 @@ var upgrader = websocket.Upgrader{
 }
 
 func main() {
+	logger.InitLogger()
+	log := logger.GetLogger()
+
 	// Подключение к базе данных
 	dsn := "host=localhost user=postgres password=postgres dbname=forum port=5432 sslmode=disable"
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		log.Fatal("Failed to connect to database", zap.Error(err))
 	}
 	defer db.Close()
 
 	// Проверка подключения
 	if err := db.Ping(); err != nil {
-		log.Fatalf("Failed to ping database: %v", err)
+		log.Fatal("Failed to ping database", zap.Error(err))
 	}
 
 	// Инициализация gRPC клиента для аутентификации
 	authClient, err := client.NewAuthClient("localhost:50051")
 	if err != nil {
-		log.Fatalf("Failed to create auth client: %v", err)
+		log.Fatal("Failed to create auth client", zap.Error(err))
 	}
 
 	// Инициализация репозиториев
@@ -70,14 +78,11 @@ func main() {
 	r := gin.Default()
 
 	// Настройка CORS
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:8081"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Cookie", "X-Requested-With"},
-		ExposeHeaders:    []string{"Content-Length", "Set-Cookie"},
-		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
-	}))
+	config := cors.DefaultConfig()
+	config.AllowOrigins = []string{"http://localhost:8081"}
+	config.AllowCredentials = true
+	config.AllowHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization"}
+	r.Use(cors.New(config))
 
 	// Загрузка HTML шаблонов
 	r.LoadHTMLGlob("templates/*")
@@ -120,63 +125,41 @@ func main() {
 	protected.GET("/chat", chatHandler.GetMessages)
 
 	// WebSocket маршрут (публичный)
-	r.GET("/ws", func(c *gin.Context) {
-		log.Printf("Получен запрос на WebSocket соединение")
-		
-		// Проверяем токен в куках
-		token, err := c.Cookie("auth_token")
-		if err != nil {
-			log.Printf("Ошибка получения токена из куки: %v", err)
-			return
-		}
-
-		if token == "" {
-			log.Printf("Пустой токен в куки")
-			return
-		}
-
-		log.Printf("Токен получен успешно")
-		
-		// Добавляем токен в заголовок
-		c.Request.Header.Set("Authorization", "Bearer "+token)
-		
-		// Вызываем middleware для установки контекста
-		authMiddleware(c)
-		
-		if c.IsAborted() {
-			log.Printf("Middleware прервал запрос")
-			return
-		}
-
-		// Проверяем, что пользователь аутентифицирован
+	r.GET("/ws", authMiddleware, func(c *gin.Context) {
 		userID, exists := c.Get("user_id")
-		if !exists || userID == nil {
-			log.Printf("Пользователь не аутентифицирован")
+		if !exists {
+			log.Error("ID пользователя не найден в контексте")
+			c.JSON(401, gin.H{"error": "unauthorized"})
 			return
 		}
 
-		username, _ := c.Get("username")
-		log.Printf("WebSocket соединение устанавливается для пользователя ID: %v, username: %v", userID, username)
-
-		// Обновляем соединение до WebSocket
-		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
-		if err != nil {
-			log.Printf("Ошибка при обновлении соединения до WebSocket: %v", err)
+		username, exists := c.Get("username")
+		if !exists {
+			log.Error("Имя пользователя не найдено в контексте")
+			c.JSON(401, gin.H{"error": "unauthorized"})
 			return
 		}
 
-		// Создаем нового клиента
-		client := &handlers.Client{
-			Conn:     conn,
-			Send:     make(chan []byte, 256),
-			Username: username.(string),
-			UserID:   int(userID.(uint32)),
+		// Преобразуем userID в int
+		userIDInt, ok := userID.(uint32)
+		if !ok {
+			log.Error("Неверный тип ID пользователя")
+			c.JSON(401, gin.H{"error": "unauthorized"})
+			return
 		}
 
-		hub.Register <- client
+		log.Info("WebSocket подключение", 
+			zap.Int("user_id", int(userIDInt)),
+			zap.String("username", username.(string)))
 
-		go hub.WritePump(client)
-		go hub.ReadPump(client)
+		// Создаем новый контекст с данными пользователя
+		ctx := context.WithValue(c.Request.Context(), "user_id", int(userIDInt))
+		ctx = context.WithValue(ctx, "username", username.(string))
+		
+		// Создаем новый запрос с обновленным контекстом
+		newReq := c.Request.WithContext(ctx)
+		
+		hub.HandleWebSocket(c.Writer, newReq)
 	})
 
 	// Главная страница со списком тредов
@@ -188,8 +171,8 @@ func main() {
 		if userRole == nil {
 			userRole = "user"
 		}
-		fmt.Printf("Debug - User Role in /: %v (type: %T)\n", userRole, userRole)
-		fmt.Printf("Debug - Raw user role in /: %q\n", userRole)
+		log.Info("Debug - User Role in /", zap.Any("role", userRole))
+		log.Info("Debug - Raw user role in /", zap.String("role", fmt.Sprintf("%v", userRole)))
 
 		// Преобразуем userID в int для корректного сравнения
 		var userIDInt int
@@ -197,8 +180,8 @@ func main() {
 			userIDInt = int(userID.(uint32))
 		}
 
-		fmt.Printf("Debug - User ID in /: %d\n", userIDInt)
-		fmt.Printf("Debug - User Role in /: %v\n", userRole)
+		log.Info("Debug - User ID in /", zap.Int("user_id", userIDInt))
+		log.Info("Debug - User Role in /", zap.Any("role", userRole))
 
 		threads, err := threadService.GetAllThreads()
 		if err != nil {
@@ -227,8 +210,8 @@ func main() {
 		if userRole == nil {
 			userRole = "user"
 		}
-		fmt.Printf("Debug - User Role in /threads: %v (type: %T)\n", userRole, userRole)
-		fmt.Printf("Debug - Raw user role in /threads: %q\n", userRole)
+		log.Info("Debug - User Role in /threads", zap.Any("role", userRole))
+		log.Info("Debug - Raw user role in /threads", zap.String("role", fmt.Sprintf("%q", userRole)))
 
 		threads, err := threadService.GetAllThreads()
 		if err != nil {
@@ -244,8 +227,8 @@ func main() {
 			userIDInt = int(userID.(uint32))
 		}
 
-		fmt.Printf("Debug - User ID in /threads: %d\n", userIDInt)
-		fmt.Printf("Debug - User Role in /threads: %v\n", userRole)
+		log.Info("Debug - User ID in /threads", zap.Int("user_id", userIDInt))
+		log.Info("Debug - User Role in /threads", zap.Any("role", userRole))
 
 		c.HTML(200, "threads.html", gin.H{
 			"threads":   threads,
@@ -265,8 +248,8 @@ func main() {
 		if userRole == nil {
 			userRole = "user"
 		}
-		fmt.Printf("Debug - User Role in /threads/:id: %v (type: %T)\n", userRole, userRole)
-		fmt.Printf("Debug - Raw user role in /threads/:id: %q\n", userRole)
+		log.Info("Debug - User Role in /threads/:id", zap.Any("role", userRole))
+		log.Info("Debug - Raw user role in /threads/:id", zap.String("role", fmt.Sprintf("%q", userRole)))
 
 		id, err := strconv.Atoi(c.Param("id"))
 		if err != nil {
@@ -289,9 +272,9 @@ func main() {
 			userIDInt = int(userID.(uint32))
 		}
 
-		fmt.Printf("Debug - Thread Author ID: %d\n", thread.AuthorID)
-		fmt.Printf("Debug - User ID: %d\n", userIDInt)
-		fmt.Printf("Debug - User Role: %v\n", userRole)
+		log.Info("Debug - Thread Author ID", zap.Int("author_id", thread.AuthorID))
+		log.Info("Debug - User ID", zap.Int("user_id", userIDInt))
+		log.Info("Debug - User Role", zap.Any("role", userRole))
 
 		c.HTML(200, "thread.html", gin.H{
 			"Thread":    thread,
@@ -315,7 +298,7 @@ func main() {
 
 		post, comments, err := postService.GetPostWithComments(id)
 		if err != nil {
-			log.Printf("Ошибка при получении поста с комментариями: %v", err)
+			log.Error("Ошибка при получении поста с комментариями", zap.Error(err))
 			c.HTML(404, "error.html", gin.H{
 				"error": "Пост не найден",
 			})
@@ -354,8 +337,13 @@ func main() {
 
 	// Запуск сервера
 	port := 8081
-	log.Printf("Server is running on port %d", port)
-	if err := r.Run(":" + strconv.Itoa(port)); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+	log.Info("Server is running", zap.Int("port", port))
+	srv := &http.Server{
+		Addr:    ":" + strconv.Itoa(port),
+		Handler: r,
+	}
+
+	if err := srv.ListenAndServe(); err != nil {
+		log.Fatal("Failed to start server", zap.Error(err))
 	}
 }

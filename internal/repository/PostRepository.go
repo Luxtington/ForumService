@@ -6,7 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/lib/pq"
-	"log"
+	"github.com/Luxtington/Shared/logger"
+	"go.uber.org/zap"
 )
 
 type postRepository struct {
@@ -87,7 +88,8 @@ func (r *postRepository) SavePost(post *models.Post) error {
 		&newPost.CreatedAt,
 	)
 	if err != nil {
-		log.Printf("Ошибка при создании поста: %v", err)
+		log := logger.GetLogger()
+		log.Error("Ошибка при создании поста", zap.Error(err))
 		return err
 	}
 
@@ -260,9 +262,11 @@ func (r *postRepository) UpdatePost(post *models.Post, postID int) error {
 }
 
 func (r *postRepository) DeletePost(postID int) error {
+	log := logger.GetLogger()
+	
 	tx, err := r.db.Begin()
 	if err != nil {
-		log.Println("error while tran begin in POST REPO 7")
+		log.Error("error while tran begin in POST REPO 7", zap.Error(err))
 		return err
 	}
 	defer tx.Rollback()
@@ -270,30 +274,30 @@ func (r *postRepository) DeletePost(postID int) error {
 	const deleteCommentsQuery = `DELETE FROM comments WHERE post_id = $1`
 	_, err = tx.Exec(deleteCommentsQuery, postID)
 	if err != nil {
-		log.Println("error while deleting comments in POST REPO 7.1")
+		log.Error("error while deleting comments in POST REPO 7.1", zap.Error(err))
 		return err
 	}
 
 	const deletePostQuery = `DELETE FROM posts WHERE id = $1`
 	result, err := tx.Exec(deletePostQuery, postID)
 	if err != nil {
-		log.Println("error while deleting post in POST REPO 7.2")
+		log.Error("error while deleting post in POST REPO 7.2", zap.Error(err))
 		return err
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		log.Println("error while checking post deleting in POST REPO 7.3")
+		log.Error("error while checking post deleting in POST REPO 7.3", zap.Error(err))
 		return err
 	}
 
 	if rowsAffected == 0 {
-		log.Println("ERROR IN DELETE POST REPO 7.4")
+		log.Error("ERROR IN DELETE POST REPO 7.4")
 		return errors.New("post not found in POST REPO")
 	}
 
 	if err = tx.Commit(); err != nil {
-		log.Println("error while tran commit: %w in POST REPO 7.5", err)
+		log.Error("error while tran commit", zap.Error(err))
 		return err
 	}
 	return nil

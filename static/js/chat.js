@@ -75,12 +75,14 @@ function initWebSocket() {
             setTimeout(initWebSocket, reconnectDelay);
         } else {
             console.log('Достигнуто максимальное количество попыток переподключения');
+            alert('Не удалось установить соединение с сервером. Пожалуйста, обновите страницу.');
         }
     };
     
     ws.onerror = function(error) {
         console.log('WebSocket ошибка:', error);
         console.log('WebSocket readyState при ошибке:', ws.readyState);
+        alert('Ошибка соединения с сервером. Пожалуйста, обновите страницу.');
     };
 }
 

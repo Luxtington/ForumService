@@ -2,12 +2,13 @@ package handlers
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"time"
 
 	"ForumService/internal/models"
 	"github.com/gorilla/websocket"
+	"github.com/Luxtington/Shared/logger"
+	"go.uber.org/zap"
 )
 
 var upgrader = websocket.Upgrader{
@@ -60,12 +61,18 @@ func (h *Hub) Run() {
 		select {
 		case client := <-h.Register:
 			h.Clients[client] = true
-			log.Printf("Клиент зарегистрирован: %s (ID: %d)", client.Username, client.UserID)
+			log := logger.GetLogger()
+			log.Info("Клиент зарегистрирован", 
+				zap.String("username", client.Username),
+				zap.Int("user_id", client.UserID))
 		case client := <-h.Unregister:
 			if _, ok := h.Clients[client]; ok {
 				delete(h.Clients, client)
 				close(client.Send)
-				log.Printf("Клиент отрегистрирован: %s (ID: %d)", client.Username, client.UserID)
+				log := logger.GetLogger()
+				log.Info("Клиент отрегистрирован",
+					zap.String("username", client.Username),
+					zap.Int("user_id", client.UserID))
 			}
 		case message := <-h.Broadcast:
 			for client := range h.Clients {
@@ -81,34 +88,37 @@ func (h *Hub) Run() {
 }
 
 func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+	log := logger.GetLogger()
+	
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("Ошибка при обновлении соединения до WebSocket: %v", err)
+		log.Error("Ошибка при обновлении соединения до WebSocket", zap.Error(err))
 		return
 	}
 
-	// Получаем данные из контекста
 	username, exists := r.Context().Value("username").(string)
 	if !exists {
-		log.Printf("Имя пользователя не найдено в контексте")
+		log.Error("Имя пользователя не найдено в контексте")
 		conn.Close()
 		return
 	}
 
-	userID, exists := r.Context().Value("user_id").(uint)
+	userID, exists := r.Context().Value("user_id").(int)
 	if !exists {
-		log.Printf("ID пользователя не найден в контексте")
+		log.Error("ID пользователя не найден в контексте")
 		conn.Close()
 		return
 	}
 
-	log.Printf("Создание нового WebSocket клиента: username=%s, userID=%d", username, userID)
+	log.Info("Создание нового WebSocket клиента",
+		zap.String("username", username),
+		zap.Int("user_id", userID))
 
 	client := &Client{
 		Conn:     conn,
 		Send:     make(chan []byte, 256),
 		Username: username,
-		UserID:   int(userID),
+		UserID:   userID,
 	}
 
 	h.Register <- client
@@ -118,6 +128,7 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Hub) WritePump(c *Client) {
+	log := logger.GetLogger()
 	ticker := time.NewTicker(54 * time.Second)
 	defer func() {
 		ticker.Stop()
@@ -135,7 +146,7 @@ func (h *Hub) WritePump(c *Client) {
 
 			w, err := c.Conn.NextWriter(websocket.TextMessage)
 			if err != nil {
-				log.Printf("Ошибка при получении writer: %v", err)
+				log.Error("Ошибка при получении writer", zap.Error(err))
 				return
 			}
 			w.Write(message)
@@ -147,13 +158,13 @@ func (h *Hub) WritePump(c *Client) {
 			}
 
 			if err := w.Close(); err != nil {
-				log.Printf("Ошибка при закрытии writer: %v", err)
+				log.Error("Ошибка при закрытии writer", zap.Error(err))
 				return
 			}
 		case <-ticker.C:
 			c.Conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				log.Printf("Ошибка при отправке ping: %v", err)
+				log.Error("Ошибка при отправке ping", zap.Error(err))
 				return
 			}
 		}
@@ -161,6 +172,7 @@ func (h *Hub) WritePump(c *Client) {
 }
 
 func (h *Hub) ReadPump(c *Client) {
+	log := logger.GetLogger()
 	defer func() {
 		h.Unregister <- c
 		c.Conn.Close()
@@ -177,29 +189,34 @@ func (h *Hub) ReadPump(c *Client) {
 		_, message, err := c.Conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("Ошибка чтения сообщения: %v", err)
+				log.Error("Ошибка чтения сообщения", zap.Error(err))
 			}
 			break
 		}
 
-		log.Printf("Получено сообщение от пользователя %s (ID: %d): %s", c.Username, c.UserID, string(message))
+		log.Info("Получено сообщение от пользователя",
+			zap.String("username", c.Username),
+			zap.Int("user_id", c.UserID),
+			zap.String("message", string(message)))
 
 		var msg Message
 		if err := json.Unmarshal(message, &msg); err != nil {
-			log.Printf("Ошибка при разборе сообщения: %v", err)
+			log.Error("Ошибка при разборе сообщения", zap.Error(err))
 			continue
 		}
 
 		if msg.Content == "" {
-			log.Printf("Получено пустое сообщение от пользователя %s", c.Username)
+			log.Info("Получено пустое сообщение", zap.String("username", c.Username))
 			continue
 		}
 
-		log.Printf("Попытка сохранения сообщения в БД: authorID=%d, content=%s", c.UserID, msg.Content)
+		log.Info("Попытка сохранения сообщения в БД",
+			zap.Int("author_id", c.UserID),
+			zap.String("content", msg.Content))
 
 		chatMessage, err := h.ChatRepo.CreateMessage(c.UserID, msg.Content)
 		if err != nil {
-			log.Printf("Ошибка при сохранении сообщения в БД: %v", err)
+			log.Error("Ошибка при сохранении сообщения в БД", zap.Error(err))
 			errorMsg := Message{
 				Type:       "error",
 				Content:    "Не удалось сохранить сообщение",
@@ -212,19 +229,37 @@ func (h *Hub) ReadPump(c *Client) {
 			continue
 		}
 
-		log.Printf("Сообщение успешно сохранено в БД: ID=%d", chatMessage.ID)
+		log.Info("Сообщение успешно сохранено в БД", zap.Int("message_id", chatMessage.ID))
 
 		msg.AuthorName = c.Username
 		msg.AuthorID = c.UserID
 		msg.CreatedAt = chatMessage.CreatedAt.Format(time.RFC3339)
+		msg.Type = "message"
 
 		messageBytes, err := json.Marshal(msg)
 		if err != nil {
-			log.Printf("Ошибка при сериализации сообщения: %v", err)
+			log.Error("Ошибка при сериализации сообщения", zap.Error(err))
 			continue
 		}
 
-		log.Printf("Отправка сообщения всем клиентам: %s", string(messageBytes))
-		h.Broadcast <- messageBytes
+		log.Info("Отправка сообщения всем клиентам", 
+			zap.String("message", string(messageBytes)),
+			zap.Int("clients_count", len(h.Clients)))
+
+		// Отправляем сообщение всем клиентам
+		for client := range h.Clients {
+			select {
+			case client.Send <- messageBytes:
+				log.Info("Сообщение отправлено клиенту",
+					zap.String("username", client.Username),
+					zap.Int("user_id", client.UserID))
+			default:
+				log.Error("Не удалось отправить сообщение клиенту",
+					zap.String("username", client.Username),
+					zap.Int("user_id", client.UserID))
+				close(client.Send)
+				delete(h.Clients, client)
+			}
+		}
 	}
 } 

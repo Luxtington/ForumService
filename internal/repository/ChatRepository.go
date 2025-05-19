@@ -2,7 +2,8 @@ package repository
 
 import (
 	"database/sql"
-	"log"
+	"github.com/Luxtington/Shared/logger"
+	"go.uber.org/zap"
 	"time"
 
 	"ForumService/internal/models"
@@ -13,6 +14,8 @@ type ChatRepository interface {
 	CreateMessage(authorID int, content string) (*models.ChatMessage, error)
 	GetAllMessages() ([]*models.ChatMessage, error)
 	DeleteOldMessages() error
+	CleanOldMessages() error
+	Cleanup() error
 }
 
 type chatRepository struct {
@@ -91,10 +94,11 @@ func (r *chatRepository) GetAllMessages() ([]*models.ChatMessage, error) {
 }
 
 func (r *chatRepository) DeleteOldMessages() error {
+	log := logger.GetLogger()
 	query := `DELETE FROM chat_messages WHERE created_at < NOW() - INTERVAL '1 minute' RETURNING id`
 	rows, err := r.db.Query(query)
 	if err != nil {
-		log.Printf("Ошибка при удалении старых сообщений: %v", err)
+		log.Error("Ошибка при удалении старых сообщений", zap.Error(err))
 		return err
 	}
 	defer rows.Close()
@@ -103,26 +107,70 @@ func (r *chatRepository) DeleteOldMessages() error {
 	for rows.Next() {
 		var id int
 		if err := rows.Scan(&id); err != nil {
-			log.Printf("Ошибка при сканировании ID удаленного сообщения: %v", err)
+			log.Error("Ошибка при сканировании ID удаленного сообщения", zap.Error(err))
 			continue
 		}
 		deletedIDs = append(deletedIDs, id)
 	}
 
 	if len(deletedIDs) > 0 {
-		log.Printf("Удалены сообщения с ID: %v", deletedIDs)
+		log.Info("Удалены сообщения", zap.Ints("message_ids", deletedIDs))
 	}
 
 	return nil
 }
 
 func (r *chatRepository) startMessageCleanup() {
+	log := logger.GetLogger()
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
 	for range ticker.C {
 		if err := r.DeleteOldMessages(); err != nil {
-			log.Printf("Ошибка при очистке старых сообщений: %v", err)
+			log.Error("Ошибка при очистке старых сообщений", zap.Error(err))
 		}
 	}
+}
+
+func (r *chatRepository) CleanOldMessages() error {
+	log := logger.GetLogger()
+	
+	// Удаляем старые сообщения
+	_, err := r.db.Exec("DELETE FROM chat_messages WHERE created_at < NOW() - INTERVAL '24 hours'")
+	if err != nil {
+		log.Error("Ошибка при удалении старых сообщений", zap.Error(err))
+		return err
+	}
+
+	// Получаем ID удаленных сообщений
+	var deletedIDs []int
+	rows, err := r.db.Query("SELECT id FROM chat_messages WHERE created_at < NOW() - INTERVAL '24 hours'")
+	if err != nil {
+		log.Error("Ошибка при сканировании ID удаленного сообщения", zap.Error(err))
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			log.Error("Ошибка при сканировании ID удаленного сообщения", zap.Error(err))
+			return err
+		}
+		deletedIDs = append(deletedIDs, id)
+	}
+
+	log.Info("Удалены сообщения", zap.Ints("message_ids", deletedIDs))
+	return nil
+}
+
+func (r *chatRepository) Cleanup() error {
+	log := logger.GetLogger()
+	
+	_, err := r.db.Exec("DELETE FROM chat_messages WHERE created_at < NOW() - INTERVAL '24 hours'")
+	if err != nil {
+		log.Error("Ошибка при очистке старых сообщений", zap.Error(err))
+		return err
+	}
+	return nil
 } 

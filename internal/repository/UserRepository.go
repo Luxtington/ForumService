@@ -4,7 +4,7 @@ import (
 	"ForumService/internal/models"
 	"database/sql"
 	"fmt"
-	"log"
+	"github.com/Luxtington/Shared/logger"
 )
 
 type userRepository struct {
@@ -19,7 +19,8 @@ func (r *userRepository) SaveUser(user *models.User) error {
 	const query = `INSERT INTO users (username, email) VALUES ($1, $2) RETURNING id`
 	err := r.db.QueryRow(query, user.Username, user.Email).Scan(&user.ID)
 	if err != nil {
-		log.Fatal("ERROR IN USER REPO 1")
+		log := logger.GetLogger()
+		log.Error("ERROR IN USER REPO 1")
 		return err
 	}
 	return nil
@@ -57,7 +58,8 @@ func (r *userRepository) GetUserByUsername(username string) (*models.User, error
 	err := r.db.QueryRow(query, username).Scan(&user.ID, &user.Username, &user.Email)
 
 	if err != nil {
-		log.Println("ERROR IN USER REPO 2")
+		log := logger.GetLogger()
+		log.Error("ERROR IN USER REPO 2")
 		return nil, err
 	}
 	return &user, nil

@@ -44,6 +44,7 @@ func AuthServiceMiddleware(authClient *client.AuthClient) gin.HandlerFunc {
 		fmt.Printf("Debug - User ID: %d, Username: %s, Role: %s\n", userID, username, role)
 		fmt.Printf("Debug - User Role type: %T\n", role)
 		fmt.Printf("Debug - Raw user role: %q\n", role)
+		fmt.Printf("Debug - Request URL: %s\n", c.Request.URL.Path)
 		
 		// Проверяем, что роль установлена в контексте
 		if role, exists := c.Get("user_role"); exists {

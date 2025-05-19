@@ -47,8 +47,8 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 		return
 	}
 
-	// Преобразуем uint в int
-	userIDInt := int(userID.(uint))
+	// Преобразуем uint32 в int
+	userIDInt := int(userID.(uint32))
 
 	// Проверяем, является ли пользователь автором треда
 	thread, err := h.service.GetThreadByID(request.ThreadID)
@@ -148,7 +148,7 @@ func (h *PostHandler) UpdatePost(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
-	userIDInt := int(userID.(uint))
+	userIDInt := int(userID.(uint32))
 
 	// Получаем роль пользователя
 	userRole, _ := c.Get("user_role")
@@ -194,7 +194,7 @@ func (h *PostHandler) DeletePost(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
-	userIDInt := int(userID.(uint))
+	userIDInt := int(userID.(uint32))
 
 	// Получаем роль пользователя
 	userRole, _ := c.Get("user_role")

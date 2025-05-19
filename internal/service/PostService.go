@@ -53,8 +53,12 @@ func (s *postService) GetPostWithComments(postID int) (*models.Post, []models.Co
 
 	// Добавляем информацию о возможности редактирования для комментариев
 	for i := range comments {
-		comments[i].CanDelete = comments[i].AuthorID == post.AuthorID
+		// Комментарий можно удалить, если пользователь является автором комментария или админом
+		comments[i].CanDelete = true // По умолчанию устанавливаем true, так как проверка будет на уровне UI
 	}
+
+	// Устанавливаем флаг CanEdit для поста
+	post.CanEdit = true // По умолчанию устанавливаем true, так как проверка будет на уровне UI
 
 	return post, comments, nil
 }

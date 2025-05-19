@@ -133,7 +133,7 @@
             {{if .post.AuthorName}}
             <span class="author">Автор: {{.post.AuthorName}}</span>
             {{end}}
-            {{if or (eq .post.AuthorID .user_id) (eq .user_role "admin")}}
+            {{if .post.CanEdit}}
             <div class="post-actions">
                 <button class="btn btn-sm btn-outline-primary edit-post" data-post-id="{{.post.ID}}" data-bs-toggle="modal" data-bs-target="#editPostModal">
                     <i class="bi bi-pencil"></i> Редактировать
@@ -201,22 +201,13 @@
                             <small class="text-muted me-3">
                                 <i class="bi bi-clock"></i> {{.CreatedAt.Format "02.01.2006 15:04"}}
                             </small>
+                            {{if .CanDelete}}
                             <div class="comment-actions">
-                                {{if eq $.user_role "admin"}}
-                                    <!-- Админ видит обе кнопки для всех комментариев -->
-                                    <button class="btn btn-sm btn-outline-primary edit-comment" data-comment-id="{{.ID}}">
-                                        <i class="bi bi-pencil"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-danger delete-comment" data-comment-id="{{.ID}}">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                {{else if eq .AuthorID $.user_id}}
-                                    <!-- Автор видит только кнопку удаления для своих комментариев -->
-                                    <button class="btn btn-sm btn-outline-danger delete-comment" data-comment-id="{{.ID}}">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                {{end}}
+                                <button class="btn btn-sm btn-outline-danger delete-comment" data-comment-id="{{.ID}}">
+                                    <i class="bi bi-trash"></i>
+                                </button>
                             </div>
+                            {{end}}
                         </div>
                     </div>
                     <div class="comment-content">
@@ -243,11 +234,12 @@
         // Инициализация переменных из шаблона
         const userId = {{ .user_id }};
         const userRole = "{{ .user_role }}";
+        const username = "{{.username}}";
         
         // Отладочная информация
         console.log('User ID:', userId, typeof userId);
         console.log('User Role:', userRole, typeof userRole);
-        console.log('Raw user role:', userRole);
+        console.log('Username:', username);
         console.log('Is Admin:', userRole === "admin");
 
         // Функция для получения токена из куки
@@ -369,20 +361,11 @@
                                     <small class="text-muted me-3">
                                         <i class="bi bi-clock"></i> ${new Date(comment.created_at).toLocaleString()}
                                     </small>
-                                    <div class="comment-actions">
-                                        ${userRole === "admin" ? `
-                                            <button class="btn btn-sm btn-outline-primary edit-comment" data-comment-id="${comment.id}">
-                                                <i class="bi bi-pencil"></i>
-                                            </button>
-                                            <button class="btn btn-sm btn-outline-danger delete-comment" data-comment-id="${comment.id}">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        ` : comment.author_id === userId ? `
-                                            <button class="btn btn-sm btn-outline-danger delete-comment" data-comment-id="${comment.id}">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        ` : ''}
-                                    </div>
+                                    ${(window.userRole === "admin" || comment.author_id === window.userId) ? `
+                                        <button class="btn btn-sm btn-outline-danger delete-comment" data-comment-id="${comment.id}">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    ` : ''}
                                 </div>
                             </div>
                             <div class="comment-content">

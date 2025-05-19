@@ -304,7 +304,7 @@ func main() {
 	})
 
 	// Получение конкретного поста (HTML)
-	r.GET("/posts/:id", func(c *gin.Context) {
+	r.GET("/posts/:id", authMiddleware, func(c *gin.Context) {
 		id, err := strconv.Atoi(c.Param("id"))
 		if err != nil {
 			c.HTML(400, "error.html", gin.H{
@@ -328,34 +328,27 @@ func main() {
 		userRole, _ := c.Get("user_role")
 		username, _ := c.Get("username")
 
-		log.Printf("Debug - User info: user=%+v, userID=%+v", user, userID)
+		// Преобразуем userID в int для корректного сравнения
+		var userIDInt int
+		if userID != nil {
+			userIDInt = int(userID.(uint32))
+		}
 
 		// Проверяем, может ли пользователь редактировать пост
-		if userID != nil {
-			userIDInt := int(userID.(uint32))
-			if post.AuthorID == userIDInt {
-				post.CanEdit = true
-			}
-		}
+		post.CanEdit = userIDInt == post.AuthorID || userRole == "admin"
 
 		// Добавляем флаг CanDelete для комментариев
 		for i := range comments {
-			if userID != nil {
-				userIDInt := int(userID.(uint32))
-				comments[i].CanDelete = comments[i].AuthorID == userIDInt
-			}
+			comments[i].CanDelete = comments[i].AuthorID == userIDInt || userRole == "admin"
 		}
 
-		log.Printf("Отправка данных в шаблон: post=%+v, comments=%+v, user=%+v, userID=%+v", post, comments, user, userID)
-
 		c.HTML(200, "post.html", gin.H{
-			"post":     post,
-			"comments": comments,
-			"user":     user,
-			"user_id":  userID,
+			"post":      post,
+			"comments":  comments,
+			"user":      user,
+			"user_id":   userIDInt,
 			"user_role": userRole,
-			"username": username,
-			"CanEdit":  post.CanEdit,
+			"username":  username,
 		})
 	})
 

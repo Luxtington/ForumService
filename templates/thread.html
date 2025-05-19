@@ -390,22 +390,26 @@
     </div>
 
     <!-- Модальное окно создания поста -->
-    <div id="createPostModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Создать новый пост</h3>
-                <span class="close" onclick="hideCreatePostModal()">&times;</span>
-            </div>
-            <form id="createPostForm">
-                <div class="form-group">
-                    <label for="postContent">Содержание поста:</label>
-                    <textarea id="postContent" name="content" required></textarea>
+    <div class="modal fade" id="createPostModal" tabindex="-1" aria-labelledby="createPostModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createPostModalLabel">Создать новый пост</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="createPostForm">
+                        <div class="mb-3">
+                            <label for="postContent" class="form-label">Содержание поста:</label>
+                            <textarea class="form-control" id="postContent" name="content" rows="5" required></textarea>
+                        </div>
+                    </form>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn" onclick="hideCreatePostModal()">Отмена</button>
-                    <button type="submit" class="btn btn-primary">Создать</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" id="savePost">Создать</button>
                 </div>
-            </form>
+            </div>
         </div>
     </div>
 
@@ -528,35 +532,47 @@
                 });
         }
 
-        // Обработчик формы создания поста
-        document.getElementById('createPostForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const content = document.getElementById('postContent').value;
+        // Обработчик создания поста
+        document.getElementById('savePost').addEventListener('click', async function() {
+            const content = document.getElementById('postContent').value.trim();
             const threadId = window.location.pathname.split('/')[2];
             
-            fetch('/api/posts', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    thread_id: parseInt(threadId),
-                    content: content
-                })
-            })
-            .then(response => {
+            if (!content) {
+                alert('Пожалуйста, введите содержание поста');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/posts', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${getToken()}`
+                    },
+                    body: JSON.stringify({
+                        thread_id: parseInt(threadId),
+                        content: content
+                    })
+                });
+
                 if (response.ok) {
+                    // Закрываем модальное окно
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('createPostModal'));
+                    modal.hide();
+                    
+                    // Очищаем форму
                     document.getElementById('postContent').value = '';
-                    hideCreatePostModal();
-                    loadThreadPosts(); // Перезагружаем посты после создания
+                    
+                    // Перезагружаем посты
+                    loadThreadPosts();
                 } else {
-                    throw new Error('Ошибка при создании поста');
+                    const error = await response.json();
+                    alert(error.error || 'Ошибка при создании поста');
                 }
-            })
-            .catch(error => {
+            } catch (error) {
                 console.error('Error:', error);
-                alert(error.message);
-            });
+                alert('Ошибка при создании поста');
+            }
         });
 
         // Обработчик формы редактирования поста
@@ -608,5 +624,7 @@
             }
         }
     </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

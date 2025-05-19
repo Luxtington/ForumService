@@ -40,8 +40,8 @@ func (h *CommentHandler) CreateComment(c *gin.Context) {
 		return
 	}
 
-	// Преобразуем uint в int
-	userIDInt := int(userID.(uint))
+	// Преобразуем uint32 в int
+	userIDInt := int(userID.(uint32))
 
 	comment, err := h.service.CreateComment(request.PostID, userIDInt, request.Content)
 	if err != nil {
@@ -65,7 +65,8 @@ func (h *CommentHandler) DeleteComment(c *gin.Context) {
 		return
 	}
 
-	userIDInt := int(userID.(uint))
+	// Преобразуем uint32 в int
+	userIDInt := int(userID.(uint32))
 
 	// Получаем роль пользователя
 	userRole, _ := c.Get("user_role")

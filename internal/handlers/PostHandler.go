@@ -50,14 +50,20 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 	// Преобразуем uint32 в int
 	userIDInt := int(userID.(uint32))
 
-	// Проверяем, является ли пользователь автором треда
+	// Получаем роль пользователя
+	userRole, _ := c.Get("user_role")
+	if userRole == nil {
+		userRole = "user"
+	}
+
+	// Проверяем, является ли пользователь автором треда или администратором
 	thread, err := h.service.GetThreadByID(request.ThreadID)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "ошибка при получении информации о треде"})
 		return
 	}
 
-	if thread.AuthorID != userIDInt {
+	if thread.AuthorID != userIDInt && userRole != "admin" {
 		c.JSON(403, gin.H{"error": "нет прав для создания поста в этом треде"})
 		return
 	}

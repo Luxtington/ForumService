@@ -49,8 +49,8 @@ func (h *ThreadHandler) CreateThread(c *gin.Context) {
 		return
 	}
 
-	// Преобразуем uint в int
-	userIDInt := int(userID.(uint))
+	// Преобразуем uint32 в int
+	userIDInt := int(userID.(uint32))
 
 	thread, err := h.service.CreateThread(request.Title, userIDInt)
 	if err != nil {
@@ -92,7 +92,7 @@ func (h *ThreadHandler) DeleteThread(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
-	userIDInt := int(userID.(uint))
+	userIDInt := int(userID.(uint32))
 
 	// Получаем роль пользователя
 	userRole, _ := c.Get("user_role")
@@ -132,7 +132,7 @@ func (h *ThreadHandler) UpdateThread(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
-	userIDInt := int(userID.(uint))
+	userIDInt := int(userID.(uint32))
 
 	// Получаем роль пользователя
 	userRole, _ := c.Get("user_role")

@@ -272,10 +272,10 @@
         <span id="currentUsername">{{.username}}</span>
     </div>
 
-    <h1 class="thread-title">
-        {{.Thread.Title}}
-        {{if or (eq .Thread.AuthorID .user_id) (eq .user_role "admin")}}
-        <div class="thread-actions" style="display: inline-block; margin-left: 15px;">
+    <div class="thread-title">
+        <h1>{{.Thread.Title}}</h1>
+        {{if eq .user_id .Thread.AuthorID}}
+        <div class="thread-actions">
             <button class="btn btn-sm btn-outline-primary edit-thread" data-thread-id="{{.Thread.ID}}">
                 <i class="bi bi-pencil"></i> Редактировать
             </button>
@@ -284,7 +284,7 @@
             </button>
         </div>
         {{end}}
-    </h1>
+    </div>
     
     <script>
         // Отладочная информация
@@ -376,8 +376,10 @@
         console.log('Debug - User Role:', window.userRole);
     </script>
     
-    {{if or (eq .Thread.AuthorID .user_id) (eq .user_role "admin")}}
-    <button class="btn btn-primary add-post-btn" onclick="showCreatePostModal()">Добавить пост</button>
+    {{if or (eq .user_id .Thread.AuthorID) (eq .user_role "admin")}}
+    <button class="btn btn-primary add-post-btn" data-bs-toggle="modal" data-bs-target="#createPostModal">
+        <i class="bi bi-plus-circle"></i> Создать пост
+    </button>
     {{end}}
     
     <div class="thread-posts">

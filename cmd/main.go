@@ -257,7 +257,7 @@ func main() {
 	})
 
 	// Получение конкретного треда с постами (HTML)
-	r.GET("/threads/:id", func(c *gin.Context) {
+	r.GET("/threads/:id", authMiddleware, func(c *gin.Context) {
 		user, _ := c.Get("user")
 		userID, _ := c.Get("user_id")
 		userRole, _ := c.Get("user_role")

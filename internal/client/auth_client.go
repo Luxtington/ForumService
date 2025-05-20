@@ -9,7 +9,7 @@ import (
 )
 
 type AuthClient struct {
-	client proto.AuthServiceClient
+	Client proto.AuthServiceClient
 }
 
 func NewAuthClient(address string) (*AuthClient, error) {
@@ -19,11 +19,11 @@ func NewAuthClient(address string) (*AuthClient, error) {
 	}
 
 	client := proto.NewAuthServiceClient(conn)
-	return &AuthClient{client: client}, nil
+	return &AuthClient{Client: client}, nil
 }
 
 func (c *AuthClient) ValidateToken(token string) (uint32, string, string, error) {
-	resp, err := c.client.ValidateToken(context.Background(), &proto.ValidateTokenRequest{
+	resp, err := c.Client.ValidateToken(context.Background(), &proto.ValidateTokenRequest{
 		Token: token,
 	})
 	if err != nil {
@@ -34,7 +34,7 @@ func (c *AuthClient) ValidateToken(token string) (uint32, string, string, error)
 }
 
 func (c *AuthClient) Register(username, password string) (uint32, string, string, error) {
-	resp, err := c.client.Register(context.Background(), &proto.RegisterRequest{
+	resp, err := c.Client.Register(context.Background(), &proto.RegisterRequest{
 		Username: username,
 		Password: password,
 	})
@@ -46,7 +46,7 @@ func (c *AuthClient) Register(username, password string) (uint32, string, string
 }
 
 func (c *AuthClient) Login(username, password string) (uint32, string, string, error) {
-	resp, err := c.client.Login(context.Background(), &proto.LoginRequest{
+	resp, err := c.Client.Login(context.Background(), &proto.LoginRequest{
 		Username: username,
 		Password: password,
 	})

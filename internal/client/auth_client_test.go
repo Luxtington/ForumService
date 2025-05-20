@@ -75,7 +75,7 @@ func TestNewAuthClient(t *testing.T) {
 	defer conn.Close()
 
 	client := proto.NewAuthServiceClient(conn)
-	authClient := &AuthClient{client: client}
+	authClient := &AuthClient{Client: client}
 
 	// Тест успешной валидации токена
 	userId, username, role, err := authClient.ValidateToken("valid_token")

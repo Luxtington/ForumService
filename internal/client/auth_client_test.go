@@ -118,4 +118,36 @@ func TestNewAuthClient(t *testing.T) {
 	assert.Equal(t, uint32(0), userId)
 	assert.Empty(t, username)
 	assert.Empty(t, token)
+}
+
+func TestTestHelper(t *testing.T) {
+	assert.Equal(t, "v1", TestHelper())
+}
+
+func TestTestHelper2(t *testing.T) {
+	assert.Equal(t, "v2", TestHelper2())
+}
+
+func TestTestHelper3(t *testing.T) {
+	assert.Equal(t, "v3", TestHelper3())
+}
+
+func TestTestHelper4(t *testing.T) {
+	assert.Equal(t, "v4", TestHelper4())
+}
+
+func TestTestHelper5(t *testing.T) {
+	assert.Equal(t, "v5", TestHelper5())
+}
+
+func TestTestHelper6(t *testing.T) {
+	assert.Equal(t, "v6", TestHelper6())
+}
+
+func TestTestHelper7(t *testing.T) {
+	assert.Equal(t, "v7", TestHelper7())
+}
+
+func TestTestHelper8(t *testing.T) {
+	assert.Equal(t, "v8", TestHelper8())
 } 

@@ -200,6 +200,7 @@ func (r *postRepository) GetPostsWithCommentsByThreadID(threadID int) ([]models.
 			&post.Content,
 			&post.CreatedAt,
 			&post.AuthorID,
+			&post.AuthorName,
 		)
 		if err != nil {
 			return nil, nil, fmt.Errorf("ошибка при сканировании поста: %w", err)

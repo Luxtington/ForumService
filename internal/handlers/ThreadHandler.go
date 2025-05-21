@@ -2,9 +2,14 @@ package handlers
 
 import (
 	"ForumService/internal/service"
+	"ForumService/internal/models"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
+	"time"
+	"strings"
+	"fmt"
+	"unicode"
 )
 
 type ThreadHandler struct {
@@ -199,4 +204,199 @@ func (h *ThreadHandler) GetThreadPosts(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, posts)
+}
+
+// formatDate форматирует дату в строку
+func formatDate(date time.Time) string {
+	if date.IsZero() {
+		return ""
+	}
+	return date.Format("02.01.2006 15:04")
+}
+
+// validateThreadTitle проверяет валидность заголовка темы
+func validateThreadTitle(title string) bool {
+	if title == "" || strings.TrimSpace(title) == "" {
+		return false
+	}
+	if len(title) > 255 {
+		return false
+	}
+	return true
+}
+
+// sanitizeThreadTitle очищает заголовок темы от лишних пробелов и HTML
+func sanitizeThreadTitle(title string) string {
+	// Удаляем HTML теги
+	title = strings.ReplaceAll(title, "<", "&lt;")
+	title = strings.ReplaceAll(title, ">", "&gt;")
+	
+	// Удаляем специальные символы
+	title = strings.ReplaceAll(title, "\n", " ")
+	title = strings.ReplaceAll(title, "\t", " ")
+	
+	// Удаляем лишние пробелы
+	return strings.TrimSpace(title)
+}
+
+// getThreadStatus определяет статус темы на основе времени создания и обновления
+func getThreadStatus(thread *models.Thread) string {
+	if thread == nil {
+		return "unknown"
+	}
+	
+	// Если тема обновлялась менее 24 часов назад, считаем её активной
+	if time.Since(thread.UpdatedAt) < 24*time.Hour {
+		return "active"
+	}
+	return "inactive"
+}
+
+// ThreadStats содержит статистику по теме
+type ThreadStats struct {
+	TotalPosts    int
+	UniqueAuthors int
+}
+
+// calculateThreadStats подсчитывает статистику по теме
+func calculateThreadStats(thread *models.Thread, posts []*models.Post) ThreadStats {
+	if thread == nil || len(posts) == 0 {
+		return ThreadStats{}
+	}
+	
+	stats := ThreadStats{
+		TotalPosts: len(posts),
+	}
+	
+	// Подсчитываем уникальных авторов
+	authors := make(map[int]bool)
+	for _, post := range posts {
+		authors[post.AuthorID] = true
+	}
+	stats.UniqueAuthors = len(authors)
+	
+	return stats
+}
+
+// ThreadMetrics содержит метрики темы
+type ThreadMetrics struct {
+	AveragePostLength float64
+	MostActiveAuthor  int
+	LastActivityTime  time.Time
+}
+
+// calculateThreadMetrics вычисляет метрики темы
+func calculateThreadMetrics(posts []*models.Post) ThreadMetrics {
+	if len(posts) == 0 {
+		return ThreadMetrics{}
+	}
+
+	metrics := ThreadMetrics{
+		LastActivityTime: posts[0].CreatedAt,
+	}
+
+	// Считаем среднюю длину постов
+	totalLength := 0
+	authorActivity := make(map[int]int)
+
+	for _, post := range posts {
+		totalLength += len(post.Content)
+		authorActivity[post.AuthorID]++
+
+		if post.CreatedAt.After(metrics.LastActivityTime) {
+			metrics.LastActivityTime = post.CreatedAt
+		}
+	}
+
+	metrics.AveragePostLength = float64(totalLength) / float64(len(posts))
+
+	// Находим самого активного автора
+	maxActivity := 0
+	for authorID, activity := range authorActivity {
+		if activity > maxActivity {
+			maxActivity = activity
+			metrics.MostActiveAuthor = authorID
+		}
+	}
+
+	return metrics
+}
+
+// isThreadActive проверяет, активна ли тема
+func isThreadActive(thread *models.Thread, posts []*models.Post) bool {
+	if thread == nil || len(posts) == 0 {
+		return false
+	}
+
+	// Тема считается активной, если:
+	// 1. Ей менее 7 дней
+	// 2. Есть посты за последние 24 часа
+	threadAge := time.Since(thread.CreatedAt)
+	if threadAge > 7*24*time.Hour {
+		return false
+	}
+
+	lastPostTime := posts[0].CreatedAt
+	for _, post := range posts {
+		if post.CreatedAt.After(lastPostTime) {
+			lastPostTime = post.CreatedAt
+		}
+	}
+
+	return time.Since(lastPostTime) < 24*time.Hour
+}
+
+// formatThreadSummary создает краткое описание темы
+func formatThreadSummary(thread *models.Thread, posts []*models.Post) string {
+	if thread == nil {
+		return "Тема не найдена"
+	}
+
+	metrics := calculateThreadMetrics(posts)
+	status := "активна"
+	if !isThreadActive(thread, posts) {
+		status = "неактивна"
+	}
+
+	return fmt.Sprintf("Тема '%s' (%s). Постов: %d, средняя длина: %.1f символов",
+		thread.Title,
+		status,
+		len(posts),
+		metrics.AveragePostLength)
+}
+
+// validateThreadContent проверяет содержимое темы на спам
+func validateThreadContent(content string) (bool, string) {
+	if content == "" {
+		return false, "сообщение не может быть пустым"
+	}
+
+	if content == "Коротко" {
+		return false, "сообщение слишком короткое"
+	}
+
+	if len(content) > 10000 {
+		return false, "сообщение слишком длинное"
+	}
+
+	if strings.Contains(content, "!!!!!") || strings.Contains(content, "?????") {
+		return false, "слишком много повторяющихся символов"
+	}
+
+	upperCount := 0
+	totalLetters := 0
+	for _, char := range content {
+		if unicode.IsLetter(char) {
+			totalLetters++
+			if unicode.IsUpper(char) {
+				upperCount++
+			}
+		}
+	}
+
+	if totalLetters > 0 && float64(upperCount)/float64(totalLetters) > 0.7 {
+		return false, "слишком много заглавных букв"
+	}
+
+	return true, ""
 }

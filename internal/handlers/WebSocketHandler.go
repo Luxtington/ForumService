@@ -90,23 +90,23 @@ func (h *Hub) Run() {
 func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	log := logger.GetLogger()
 	
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Error("Ошибка при обновлении соединения до WebSocket", zap.Error(err))
-		return
-	}
-
 	username, exists := r.Context().Value("username").(string)
-	if !exists {
-		log.Error("Имя пользователя не найдено в контексте")
-		conn.Close()
+	if !exists || username == "" {
+		log.Error("Имя пользователя не найдено в контексте или пустое")
+		http.Error(w, "Имя пользователя не найдено", http.StatusBadRequest)
 		return
 	}
 
 	userID, exists := r.Context().Value("user_id").(int)
-	if !exists {
-		log.Error("ID пользователя не найден в контексте")
-		conn.Close()
+	if !exists || userID <= 0 {
+		log.Error("ID пользователя не найден в контексте или некорректный")
+		http.Error(w, "ID пользователя не найден", http.StatusBadRequest)
+		return
+	}
+
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Error("Ошибка при обновлении соединения до WebSocket", zap.Error(err))
 		return
 	}
 

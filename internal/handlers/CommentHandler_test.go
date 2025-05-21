@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"ForumService/internal/handlers/mocks"
 	"ForumService/internal/models"
 	"net/http"
@@ -13,154 +14,382 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCreateComment(t *testing.T) {
-	tests := []struct {
-		name           string
-		postID         string
-		requestBody    map[string]interface{}
-		mockResponse   *models.Comment
-		mockError      error
-		expectedStatus int
-		userID         uint
-	}{
-		{
-			name:   "успешное создание комментария",
-			postID: "1",
-			requestBody: map[string]interface{}{
-				"post_id": 1,
-				"content": "Test Comment Content",
-			},
-			mockResponse: &models.Comment{
-				ID:       1,
-				Content:  "Test Comment Content",
-				PostID:   1,
-				AuthorID: 1,
-			},
-			mockError:      nil,
-			expectedStatus: http.StatusCreated,
-			userID:         1,
-		},
-		{
-			name:   "неверный формат данных",
-			postID: "1",
-			requestBody: map[string]interface{}{
-				"invalid": "data",
-			},
-			mockResponse:   nil,
-			mockError:      nil,
-			expectedStatus: http.StatusBadRequest,
-			userID:         1,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockService := &mocks.MockCommentService{
-				CreateCommentFunc: func(postID int, authorID int, content string) (*models.Comment, error) {
-					return tt.mockResponse, tt.mockError
-				},
-			}
-
-			handler := NewCommentHandler(mockService)
-			router := setupTestRouter()
-			router.POST("/posts/:postID/comments", func(c *gin.Context) {
-				c.Set("user_id", tt.userID)
-				c.Params = []gin.Param{{Key: "postID", Value: tt.postID}}
-				handler.CreateComment(c)
-			})
-
-			body, _ := json.Marshal(tt.requestBody)
-			req := httptest.NewRequest("POST", "/posts/"+tt.postID+"/comments", bytes.NewBuffer(body))
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
-
-			router.ServeHTTP(w, req)
-
-			assert.Equal(t, tt.expectedStatus, w.Code)
-		})
-	}
+func setupCommentTestRouter() *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.LoadHTMLGlob("../../templates/*")
+	return router
 }
 
-func TestDeleteComment(t *testing.T) {
-	tests := []struct {
-		name           string
-		commentID      string
-		userID         uint
-		userRole       string
-		mockComment    *models.Comment
-		mockError      error
-		expectedStatus int
-	}{
-		{
-			name:      "успешное удаление комментария автором",
-			commentID: "1",
-			userID:    1,
-			userRole:  "user",
-			mockComment: &models.Comment{
+func TestCommentHandler_CreateComment_Success(t *testing.T) {
+	mockCommentService := &mocks.MockCommentService{
+		CreateCommentFunc: func(postID int, authorID int, content string) (*models.Comment, error) {
+			return &models.Comment{
 				ID:       1,
-				Content:  "Test Comment",
-				PostID:   1,
-				AuthorID: 1,
-			},
-			mockError:      nil,
-			expectedStatus: http.StatusNoContent,
-		},
-		{
-			name:      "успешное удаление комментария админом",
-			commentID: "1",
-			userID:    2,
-			userRole:  "admin",
-			mockComment: &models.Comment{
-				ID:       1,
-				Content:  "Test Comment",
-				PostID:   1,
-				AuthorID: 1,
-			},
-			mockError:      nil,
-			expectedStatus: http.StatusNoContent,
-		},
-		{
-			name:      "отказ в доступе",
-			commentID: "1",
-			userID:    2,
-			userRole:  "user",
-			mockComment: &models.Comment{
-				ID:       1,
-				Content:  "Test Comment",
-				PostID:   1,
-				AuthorID: 1,
-			},
-			mockError:      nil,
-			expectedStatus: http.StatusForbidden,
+				PostID:   postID,
+				AuthorID: authorID,
+				Content:  content,
+			}, nil
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockService := &mocks.MockCommentService{
-				GetCommentByIDFunc: func(id int) (*models.Comment, error) {
-					return tt.mockComment, nil
-				},
-				DeleteCommentFunc: func(id int, userID int) error {
-					return tt.mockError
-				},
-			}
+	handler := NewCommentHandler(mockCommentService)
 
-			handler := NewCommentHandler(mockService)
-			router := setupTestRouter()
-			router.DELETE("/comments/:id", func(c *gin.Context) {
-				c.Set("user_id", tt.userID)
-				c.Set("user_role", tt.userRole)
-				c.Params = []gin.Param{{Key: "id", Value: tt.commentID}}
-				handler.DeleteComment(c)
-			})
+	router := setupCommentTestRouter()
+	router.POST("/comments", func(c *gin.Context) {
+		c.Set("user_id", uint32(1))
+		handler.CreateComment(c)
+	})
 
-			req := httptest.NewRequest("DELETE", "/comments/"+tt.commentID, nil)
-			w := httptest.NewRecorder()
-
-			router.ServeHTTP(w, req)
-
-			assert.Equal(t, tt.expectedStatus, w.Code)
-		})
+	requestBody := map[string]interface{}{
+		"post_id": 1,
+		"content": "Test comment",
 	}
-} 
+	jsonBody, _ := json.Marshal(requestBody)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/comments", bytes.NewBuffer(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+}
+
+func TestCommentHandler_CreateComment_Unauthorized(t *testing.T) {
+	mockCommentService := &mocks.MockCommentService{}
+	handler := NewCommentHandler(mockCommentService)
+
+	router := setupCommentTestRouter()
+	router.POST("/comments", handler.CreateComment)
+
+	requestBody := map[string]interface{}{
+		"post_id": 1,
+		"content": "Test comment",
+	}
+	jsonBody, _ := json.Marshal(requestBody)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/comments", bytes.NewBuffer(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestCommentHandler_CreateComment_InvalidData(t *testing.T) {
+	mockCommentService := &mocks.MockCommentService{}
+	handler := NewCommentHandler(mockCommentService)
+
+	router := setupCommentTestRouter()
+	router.POST("/comments", func(c *gin.Context) {
+		c.Set("user_id", uint32(1))
+		handler.CreateComment(c)
+	})
+
+	requestBody := map[string]interface{}{
+		"post_id": "invalid",
+		"content": "",
+	}
+	jsonBody, _ := json.Marshal(requestBody)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/comments", bytes.NewBuffer(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestCommentHandler_CreateComment_ServiceError(t *testing.T) {
+	mockCommentService := &mocks.MockCommentService{
+		CreateCommentFunc: func(postID int, authorID int, content string) (*models.Comment, error) {
+			return nil, errors.New("service error")
+		},
+	}
+
+	handler := NewCommentHandler(mockCommentService)
+
+	router := setupCommentTestRouter()
+	router.POST("/comments", func(c *gin.Context) {
+		c.Set("user_id", uint32(1))
+		handler.CreateComment(c)
+	})
+
+	requestBody := map[string]interface{}{
+		"post_id": 1,
+		"content": "Test comment",
+	}
+	jsonBody, _ := json.Marshal(requestBody)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/comments", bytes.NewBuffer(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestCommentHandler_DeleteComment_Success(t *testing.T) {
+	mockCommentService := &mocks.MockCommentService{
+		GetCommentByIDFunc: func(id int) (*models.Comment, error) {
+			return &models.Comment{
+				ID:       1,
+				PostID:   1,
+				AuthorID: 1,
+				Content:  "Test comment",
+			}, nil
+		},
+		DeleteCommentFunc: func(id int, userID int) error {
+			return nil
+		},
+	}
+
+	handler := NewCommentHandler(mockCommentService)
+
+	router := setupCommentTestRouter()
+	router.DELETE("/comments/:id", func(c *gin.Context) {
+		c.Set("user_id", uint32(1))
+		c.Set("user_role", "user")
+		handler.DeleteComment(c)
+	})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("DELETE", "/comments/1", nil)
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNoContent, w.Code)
+}
+
+func TestCommentHandler_DeleteComment_Unauthorized(t *testing.T) {
+	mockCommentService := &mocks.MockCommentService{}
+	handler := NewCommentHandler(mockCommentService)
+
+	router := setupCommentTestRouter()
+	router.DELETE("/comments/:id", handler.DeleteComment)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("DELETE", "/comments/1", nil)
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+func TestCommentHandler_DeleteComment_InvalidID(t *testing.T) {
+	mockCommentService := &mocks.MockCommentService{}
+	handler := NewCommentHandler(mockCommentService)
+
+	router := setupCommentTestRouter()
+	router.DELETE("/comments/:id", func(c *gin.Context) {
+		c.Set("user_id", uint32(1))
+		c.Set("user_role", "user")
+		handler.DeleteComment(c)
+	})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("DELETE", "/comments/invalid", nil)
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestCommentHandler_DeleteComment_NoPermission(t *testing.T) {
+	mockCommentService := &mocks.MockCommentService{
+		GetCommentByIDFunc: func(id int) (*models.Comment, error) {
+			return &models.Comment{
+				ID:       1,
+				PostID:   1,
+				AuthorID: 2,
+				Content:  "Test comment",
+			}, nil
+		},
+	}
+
+	handler := NewCommentHandler(mockCommentService)
+
+	router := setupCommentTestRouter()
+	router.DELETE("/comments/:id", func(c *gin.Context) {
+		c.Set("user_id", uint32(1))
+		c.Set("user_role", "user")
+		handler.DeleteComment(c)
+	})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("DELETE", "/comments/1", nil)
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestCommentHandler_DeleteComment_AdminSuccess(t *testing.T) {
+	mockCommentService := &mocks.MockCommentService{
+		GetCommentByIDFunc: func(id int) (*models.Comment, error) {
+			return &models.Comment{
+				ID:       1,
+				PostID:   1,
+				AuthorID: 2,
+				Content:  "Test comment",
+			}, nil
+		},
+		DeleteCommentFunc: func(id int, userID int) error {
+			return nil
+		},
+	}
+
+	handler := NewCommentHandler(mockCommentService)
+
+	router := setupCommentTestRouter()
+	router.DELETE("/comments/:id", func(c *gin.Context) {
+		c.Set("user_id", uint32(1))
+		c.Set("user_role", "admin")
+		handler.DeleteComment(c)
+	})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("DELETE", "/comments/1", nil)
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNoContent, w.Code)
+}
+
+func TestCommentHandler_DeleteComment_GetCommentError(t *testing.T) {
+	mockCommentService := &mocks.MockCommentService{
+		GetCommentByIDFunc: func(id int) (*models.Comment, error) {
+			return nil, errors.New("error getting comment")
+		},
+	}
+
+	handler := NewCommentHandler(mockCommentService)
+
+	router := setupCommentTestRouter()
+	router.DELETE("/comments/:id", func(c *gin.Context) {
+		c.Set("user_id", uint32(1))
+		c.Set("user_role", "user")
+		handler.DeleteComment(c)
+	})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("DELETE", "/comments/1", nil)
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestCommentHandler_DeleteComment_DeleteError(t *testing.T) {
+	mockCommentService := &mocks.MockCommentService{
+		GetCommentByIDFunc: func(id int) (*models.Comment, error) {
+			return &models.Comment{
+				ID:       1,
+				PostID:   1,
+				AuthorID: 1,
+				Content:  "Test comment",
+			}, nil
+		},
+		DeleteCommentFunc: func(id int, userID int) error {
+			return errors.New("error deleting comment")
+		},
+	}
+
+	handler := NewCommentHandler(mockCommentService)
+
+	router := setupCommentTestRouter()
+	router.DELETE("/comments/:id", func(c *gin.Context) {
+		c.Set("user_id", uint32(1))
+		c.Set("user_role", "user")
+		handler.DeleteComment(c)
+	})
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("DELETE", "/comments/1", nil)
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestCommentHandler_CreateChatMessage_Success(t *testing.T) {
+	mockCommentService := &mocks.MockCommentService{
+		CreateCommentFunc: func(postID int, authorID int, content string) (*models.Comment, error) {
+			return &models.Comment{
+				ID:       1,
+				PostID:   0,
+				AuthorID: 1,
+				Content:  content,
+			}, nil
+		},
+	}
+
+	handler := NewCommentHandler(mockCommentService)
+
+	router := setupCommentTestRouter()
+	router.POST("/chat/messages", handler.CreateChatMessage)
+
+	requestBody := map[string]interface{}{
+		"content": "Test chat message",
+	}
+	jsonBody, _ := json.Marshal(requestBody)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/chat/messages", bytes.NewBuffer(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+}
+
+func TestCommentHandler_CreateChatMessage_InvalidData(t *testing.T) {
+	mockCommentService := &mocks.MockCommentService{}
+	handler := NewCommentHandler(mockCommentService)
+
+	router := setupCommentTestRouter()
+	router.POST("/chat/messages", handler.CreateChatMessage)
+
+	requestBody := map[string]interface{}{
+		"content": "",
+	}
+	jsonBody, _ := json.Marshal(requestBody)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/chat/messages", bytes.NewBuffer(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestCommentHandler_CreateChatMessage_ServiceError(t *testing.T) {
+	mockCommentService := &mocks.MockCommentService{
+		CreateCommentFunc: func(postID int, authorID int, content string) (*models.Comment, error) {
+			return nil, errors.New("service error")
+		},
+	}
+
+	handler := NewCommentHandler(mockCommentService)
+
+	router := setupCommentTestRouter()
+	router.POST("/chat/messages", handler.CreateChatMessage)
+
+	requestBody := map[string]interface{}{
+		"content": "Test chat message",
+	}
+	jsonBody, _ := json.Marshal(requestBody)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/chat/messages", bytes.NewBuffer(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}

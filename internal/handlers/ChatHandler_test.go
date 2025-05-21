@@ -8,123 +8,206 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCreateMessage(t *testing.T) {
+func TestChatHandler_CreateMessage(t *testing.T) {
 	tests := []struct {
 		name           string
 		requestBody    map[string]interface{}
-		mockResponse   *models.ChatMessage
+		userID         interface{}
+		mockMessage    *models.ChatMessage
 		mockError      error
 		expectedStatus int
-		userID         uint
+		expectedBody   map[string]interface{}
 	}{
 		{
 			name: "успешное создание сообщения",
 			requestBody: map[string]interface{}{
-				"content": "Test Message Content",
+				"content": "Test message",
 			},
-			mockResponse: &models.ChatMessage{
-				ID:       1,
-				Content:  "Test Message Content",
-				AuthorID: 1,
+			userID: uint(1),
+			mockMessage: &models.ChatMessage{
+				ID:        1,
+				Content:   "Test message",
+				AuthorID:  1,
+				AuthorName: "",
+				CreatedAt: time.Time{},
 			},
 			mockError:      nil,
 			expectedStatus: http.StatusCreated,
-			userID:         1,
+			expectedBody: map[string]interface{}{
+				"id":          float64(1),
+				"content":     "Test message",
+				"author_id":   float64(1),
+				"author_name": "",
+				"created_at":  "0001-01-01T00:00:00Z",
+			},
 		},
 		{
 			name: "неверный формат данных",
 			requestBody: map[string]interface{}{
 				"invalid": "data",
 			},
-			mockResponse:   nil,
+			userID:         uint(1),
+			mockMessage:    nil,
 			mockError:      nil,
 			expectedStatus: http.StatusBadRequest,
-			userID:         1,
+			expectedBody: map[string]interface{}{
+				"error": "неверный формат данных",
+			},
+		},
+		{
+			name: "пользователь не аутентифицирован",
+			requestBody: map[string]interface{}{
+				"content": "Test message",
+			},
+			userID:         nil,
+			mockMessage:    nil,
+			mockError:      nil,
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody: map[string]interface{}{
+				"error": "пользователь не аутентифицирован",
+			},
+		},
+		{
+			name: "ошибка сервиса",
+			requestBody: map[string]interface{}{
+				"content": "Test message",
+			},
+			userID:         uint(1),
+			mockMessage:    nil,
+			mockError:      assert.AnError,
+			expectedStatus: http.StatusInternalServerError,
+			expectedBody: map[string]interface{}{
+				"error": assert.AnError.Error(),
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockService := &mocks.MockChatService{
+			mockChatService := &mocks.MockChatService{
 				CreateMessageFunc: func(authorID int, content string) (*models.ChatMessage, error) {
-					return tt.mockResponse, tt.mockError
+					return tt.mockMessage, tt.mockError
 				},
 			}
 
-			handler := NewChatHandler(mockService)
-			router := setupTestRouter()
-			router.POST("/chat/messages", func(c *gin.Context) {
-				c.Set("user_id", tt.userID)
+			handler := NewChatHandler(mockChatService)
+			router := setupViewsTestRouter()
+			router.POST("/messages", func(c *gin.Context) {
+				if tt.userID != nil {
+					c.Set("user_id", tt.userID)
+				}
 				handler.CreateMessage(c)
 			})
 
 			body, _ := json.Marshal(tt.requestBody)
-			req := httptest.NewRequest("POST", "/chat/messages", bytes.NewBuffer(body))
+			req := httptest.NewRequest("POST", "/messages", bytes.NewBuffer(body))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
+
+			var response map[string]interface{}
+			err := json.Unmarshal(w.Body.Bytes(), &response)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expectedBody, response)
 		})
 	}
 }
 
-func TestGetMessages(t *testing.T) {
+func TestChatHandler_GetMessages(t *testing.T) {
 	tests := []struct {
 		name           string
-		mockResponse   []*models.ChatMessage
+		mockMessages   []*models.ChatMessage
 		mockError      error
 		expectedStatus int
+		expectedBody   interface{}
 	}{
 		{
 			name: "успешное получение сообщений",
-			mockResponse: []*models.ChatMessage{
+			mockMessages: []*models.ChatMessage{
 				{
-					ID:       1,
-					Content:  "Test Message 1",
-					AuthorID: 1,
+					ID:         1,
+					Content:    "Test message 1",
+					AuthorID:   1,
+					AuthorName: "",
+					CreatedAt:  time.Time{},
 				},
 				{
-					ID:       2,
-					Content:  "Test Message 2",
-					AuthorID: 2,
+					ID:         2,
+					Content:    "Test message 2",
+					AuthorID:   2,
+					AuthorName: "",
+					CreatedAt:  time.Time{},
 				},
 			},
 			mockError:      nil,
 			expectedStatus: http.StatusOK,
+			expectedBody: []interface{}{
+				map[string]interface{}{
+					"id":          float64(1),
+					"content":     "Test message 1",
+					"author_id":   float64(1),
+					"author_name": "",
+					"created_at":  "0001-01-01T00:00:00Z",
+				},
+				map[string]interface{}{
+					"id":          float64(2),
+					"content":     "Test message 2",
+					"author_id":   float64(2),
+					"author_name": "",
+					"created_at":  "0001-01-01T00:00:00Z",
+				},
+			},
 		},
 		{
-			name:           "ошибка при получении сообщений",
-			mockResponse:   nil,
+			name:           "пустой список сообщений",
+			mockMessages:   []*models.ChatMessage{},
+			mockError:      nil,
+			expectedStatus: http.StatusOK,
+			expectedBody:   []interface{}{},
+		},
+		{
+			name:           "ошибка сервиса",
+			mockMessages:   nil,
 			mockError:      assert.AnError,
 			expectedStatus: http.StatusInternalServerError,
+			expectedBody: map[string]interface{}{
+				"error": assert.AnError.Error(),
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockService := &mocks.MockChatService{
+			mockChatService := &mocks.MockChatService{
 				GetAllMessagesFunc: func() ([]*models.ChatMessage, error) {
-					return tt.mockResponse, tt.mockError
+					return tt.mockMessages, tt.mockError
 				},
 			}
 
-			handler := NewChatHandler(mockService)
-			router := setupTestRouter()
-			router.GET("/chat/messages", handler.GetMessages)
+			handler := NewChatHandler(mockChatService)
+			router := setupViewsTestRouter()
+			router.GET("/messages", handler.GetMessages)
 
-			req := httptest.NewRequest("GET", "/chat/messages", nil)
+			req := httptest.NewRequest("GET", "/messages", nil)
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
+
+			var response interface{}
+			err := json.Unmarshal(w.Body.Bytes(), &response)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expectedBody, response)
 		})
 	}
 } 

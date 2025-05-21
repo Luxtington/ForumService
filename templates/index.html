@@ -157,7 +157,7 @@
                             </div>
                             <p class="card-text text-muted mt-2">
                                 <small>
-                                    <i class="bi bi-clock"></i> {{.CreatedAt.Format "02.01.2006 15:04"}}
+                                    <i class="bi bi-clock"></i> {{.CreatedAt.Format "02.01.2006"}}
                                 </small>
                             </p>
                         </div>
@@ -180,7 +180,7 @@
                             {{range .ChatMessages}}
                             <div class="chat-message">
                                 <div class="chat-message-meta">
-                                    <i class="bi bi-person-circle"></i> {{.AuthorName}} • {{.CreatedAt.Format "15:04"}}
+                                    <i class="bi bi-person-circle"></i> {{.AuthorName}} • {{.CreatedAt.Format "02.01.2006"}}
                                 </div>
                                 <div class="chat-message-content">
                                     {{.Content}}

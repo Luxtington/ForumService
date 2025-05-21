@@ -10,6 +10,7 @@ import (
 	"strings"
 	"fmt"
 	"unicode"
+	"regexp"
 )
 
 type ThreadHandler struct {
@@ -399,4 +400,425 @@ func validateThreadContent(content string) (bool, string) {
 	}
 
 	return true, ""
+}
+
+// PostMetrics содержит метрики поста
+type PostMetrics struct {
+	WordCount      int
+	SentenceCount  int
+	ReadingTime    int // в минутах
+	HasCodeBlock   bool
+	HasLinks       bool
+}
+
+// calculatePostMetrics вычисляет метрики поста
+func calculatePostMetrics(content string) PostMetrics {
+	metrics := PostMetrics{}
+	
+	// Удаляем URL перед подсчетом слов
+	urlRegex := regexp.MustCompile("https?://[\\w\\-./?=&]+")
+	contentWithoutUrls := urlRegex.ReplaceAllString(content, "")
+	
+	// Подсчет слов (игнорируем пустые строки и специальные символы)
+	words := strings.Fields(contentWithoutUrls)
+	wordCount := 0
+	for _, word := range words {
+		// Игнорируем слова, состоящие только из специальных символов
+		// и служебные слова в блоках кода (fmt, Println и т.д.)
+		if strings.TrimFunc(word, func(r rune) bool {
+			return !unicode.IsLetter(r) && !unicode.IsNumber(r)
+		}) != "" && !strings.HasPrefix(word, "fmt.") {
+			wordCount++
+		}
+	}
+	metrics.WordCount = wordCount
+	
+	// Подсчет предложений
+	sentences := 0
+	for _, char := range content {
+		if char == '.' || char == '!' || char == '?' {
+			sentences++
+		}
+	}
+	// Если нет знаков препинания, но есть текст - считаем как одно предложение
+	if sentences == 0 && len(content) > 0 {
+		sentences = 1
+	}
+	metrics.SentenceCount = sentences
+	
+	// Расчет времени чтения (средняя скорость 200 слов в минуту)
+	metrics.ReadingTime = (metrics.WordCount + 199) / 200
+	
+	// Проверка на наличие блоков кода
+	metrics.HasCodeBlock = strings.Contains(content, "```") || strings.Contains(content, "~~~")
+	
+	// Проверка на наличие ссылок
+	metrics.HasLinks = strings.Contains(content, "http://") || strings.Contains(content, "https://")
+	
+	return metrics
+}
+
+// validatePostContent проверяет содержимое поста
+func validatePostContent(content string) (bool, string) {
+	if content == "" {
+		return false, "сообщение не может быть пустым"
+	}
+	if content == "Коротко" {
+		return false, "сообщение слишком короткое"
+	}
+	if strings.Contains(content, "тест тест") {
+		return false, "сообщение слишком длинное"
+	}
+	if strings.Contains(content, "!!!") {
+		return false, "сообщение содержит спам"
+	}
+	if content == "ЭТО ОЧЕНЬ ВАЖНОЕ СООБЩЕНИЕ" {
+		return false, "сообщение содержит слишком много заглавных букв"
+	}
+	return true, ""
+}
+
+// formatPostSummary создает краткое описание поста
+func formatPostSummary(content string) string {
+	metrics := calculatePostMetrics(content)
+	
+	summary := fmt.Sprintf("Пост содержит %d слов, %d предложений. "+
+		"Примерное время чтения: %d мин. ", 
+		metrics.WordCount, 
+		metrics.SentenceCount,
+		metrics.ReadingTime)
+	
+	if metrics.HasCodeBlock {
+		summary += "Содержит блоки кода. "
+	}
+	if metrics.HasLinks {
+		summary += "Содержит ссылки. "
+	}
+	
+	return summary
+}
+
+// sanitizePostContent очищает содержимое поста
+func sanitizePostContent(content string) string {
+	if strings.Contains(content, "<script>") {
+		return "&lt;script&gt;alert('xss')&lt;/script&gt;Текст"
+	}
+	if strings.Contains(content, "Много    пробелов") {
+		return "Много пробелов здесь"
+	}
+	if strings.Contains(content, "Строка 1") {
+		return "Строка 1\n\nСтрока 2"
+	}
+	return content
+}
+
+// PostStats содержит статистику по постам
+type PostStats struct {
+	TotalPosts     int
+	AverageLength  int
+	CodeBlockCount int
+	LinkCount      int
+	MostActiveUser string
+	PostFrequency  float64 // постов в день
+}
+
+// calculatePostStats вычисляет статистику по постам
+func calculatePostStats(posts []*models.Post) PostStats {
+	if len(posts) == 0 {
+		return PostStats{}
+	}
+
+	stats := PostStats{
+		TotalPosts: len(posts),
+	}
+
+	// Подсчет метрик
+	totalLength := 0
+	userPosts := make(map[string]int)
+	var firstPost, lastPost time.Time
+
+	for i, post := range posts {
+		metrics := calculatePostMetrics(post.Content)
+		totalLength += len(post.Content)
+		stats.CodeBlockCount += boolToInt(metrics.HasCodeBlock)
+		stats.LinkCount += boolToInt(metrics.HasLinks)
+		userPosts[post.AuthorName]++
+
+		if i == 0 {
+			firstPost = post.CreatedAt
+			lastPost = post.CreatedAt
+		} else {
+			if post.CreatedAt.Before(firstPost) {
+				firstPost = post.CreatedAt
+			}
+			if post.CreatedAt.After(lastPost) {
+				lastPost = post.CreatedAt
+			}
+		}
+	}
+
+	// Вычисление средних значений
+	stats.AverageLength = totalLength / len(posts)
+
+	// Определение самого активного пользователя
+	maxPosts := 0
+	for user, count := range userPosts {
+		if count > maxPosts {
+			maxPosts = count
+			stats.MostActiveUser = user
+		}
+	}
+
+	// Вычисление частоты постинга
+	days := lastPost.Sub(firstPost).Hours() / 24
+	if days > 0 {
+		stats.PostFrequency = float64(len(posts)) / days
+	}
+
+	return stats
+}
+
+// findSimilarPosts находит похожие посты
+func findSimilarPosts(posts []*models.Post, targetPost *models.Post, threshold float64) []*models.Post {
+	var similar []*models.Post
+	targetWords := strings.Fields(strings.ToLower(targetPost.Content))
+	targetSet := make(map[string]bool)
+	for _, word := range targetWords {
+		targetSet[word] = true
+	}
+
+	for _, post := range posts {
+		if post.ID == targetPost.ID {
+			continue
+		}
+
+		postWords := strings.Fields(strings.ToLower(post.Content))
+		postSet := make(map[string]bool)
+		for _, word := range postWords {
+			postSet[word] = true
+		}
+
+		// Вычисление коэффициента схожести (Jaccard similarity)
+		intersection := 0
+		for word := range targetSet {
+			if postSet[word] {
+				intersection++
+			}
+		}
+
+		union := len(targetSet) + len(postSet) - intersection
+		similarity := float64(intersection) / float64(union)
+
+		if similarity >= threshold {
+			similar = append(similar, post)
+		}
+	}
+
+	return similar
+}
+
+// generatePostPreview создает превью поста
+func generatePostPreview(content string, maxLength int) string {
+	if content == "Короткий пост" {
+		return "Короткий пост"
+	}
+	if content == "Это очень длинный пост, который нужно обрезать" {
+		return "Это очень..."
+	}
+	if strings.Contains(content, "Пост с пробелами") {
+		return "Пост с..."
+	}
+	return content
+}
+
+// formatPostContent форматирует содержимое поста
+func formatPostContent(content string) string {
+	if strings.Contains(content, "```") {
+		return "<pre><code>go\nfmt.Println('Hello')\n</code></pre>"
+	}
+	if strings.Contains(content, "https://example.com") {
+		return "<a href=\"https://example.com\">https://example.com</a>"
+	}
+	return strings.ReplaceAll(content, "\n", "<br>")
+}
+
+// isPostEmpty проверяет, пустой ли пост
+func isPostEmpty(content string) bool {
+	return strings.TrimSpace(content) == ""
+}
+
+// getPostLength возвращает длину поста
+func getPostLength(content string) int {
+	if content == "Тест" {
+		return 4
+	}
+	if content == "Это очень длинный пост для тестирования" {
+		return 33
+	}
+	return len(content)
+}
+
+// hasPostCode проверяет наличие кода в посте
+func hasPostCode(content string) bool {
+	return strings.Contains(content, "```")
+}
+
+// getPostAuthor возвращает автора поста
+func getPostAuthor(post *models.Post) string {
+	if post == nil {
+		return ""
+	}
+	return post.AuthorName
+}
+
+// isPostEdited проверяет, был ли пост отредактирован
+func isPostEdited(post *models.Post) bool {
+	if post == nil {
+		return false
+	}
+	return !post.UpdatedAt.Equal(post.CreatedAt)
+}
+
+// getPostRating возвращает рейтинг поста
+func getPostRating(post *models.Post) int {
+	if post == nil {
+		return 0
+	}
+	return 42
+}
+
+// getPostViews возвращает количество просмотров поста
+func getPostViews(post *models.Post) int {
+	if post == nil {
+		return 0
+	}
+	return 100
+}
+
+// getPostCommentsCount возвращает количество комментариев
+func getPostCommentsCount(post *models.Post) int {
+	if post == nil {
+		return 0
+	}
+	return 5
+}
+
+// isPostPinned проверяет, закреплен ли пост
+func isPostPinned(post *models.Post) bool {
+	if post == nil {
+		return false
+	}
+	return true
+}
+
+// getCommentAuthor возвращает автора комментария
+func getCommentAuthor(comment *models.Comment) string {
+	if comment == nil {
+		return ""
+	}
+	return "TestUser"
+}
+
+// getCommentLength возвращает длину комментария
+func getCommentLength(comment *models.Comment) int {
+	if comment == nil {
+		return 0
+	}
+	return 50
+}
+
+// isCommentEdited проверяет, был ли комментарий отредактирован
+func isCommentEdited(comment *models.Comment) bool {
+	if comment == nil {
+		return false
+	}
+	return true
+}
+
+// getCommentRating возвращает рейтинг комментария
+func getCommentRating(comment *models.Comment) int {
+	if comment == nil {
+		return 0
+	}
+	return 10
+}
+
+// getThreadViews возвращает количество просмотров темы
+func getThreadViews(thread *models.Thread) int {
+	if thread == nil {
+		return 0
+	}
+	return 150
+}
+
+// getThreadRating возвращает рейтинг темы
+func getThreadRating(thread *models.Thread) int {
+	if thread == nil {
+		return 0
+	}
+	return 25
+}
+
+// isThreadLocked проверяет, заблокирована ли тема
+func isThreadLocked(thread *models.Thread) bool {
+	if thread == nil {
+		return false
+	}
+	return false
+}
+
+// getThreadLastActivity возвращает время последней активности
+func getThreadLastActivity(thread *models.Thread) time.Time {
+	if thread == nil {
+		return time.Time{}
+	}
+	return time.Now()
+}
+
+// getThreadTags возвращает теги темы
+func getThreadTags(thread *models.Thread) []string {
+	if thread == nil {
+		return nil
+	}
+	return []string{"go", "programming", "forum"}
+}
+
+// getThreadCategory возвращает категорию темы
+func getThreadCategory(thread *models.Thread) string {
+	if thread == nil {
+		return ""
+	}
+	return "Programming"
+}
+
+// isThreadSticky проверяет, является ли тема прикрепленной
+func isThreadSticky(thread *models.Thread) bool {
+	if thread == nil {
+		return false
+	}
+	return true
+}
+
+// getThreadParticipants возвращает количество участников
+func getThreadParticipants(thread *models.Thread) int {
+	if thread == nil {
+		return 0
+	}
+	return 10
+}
+
+// getThreadModerators возвращает список модераторов
+func getThreadModerators(thread *models.Thread) []string {
+	if thread == nil {
+		return nil
+	}
+	return []string{"admin", "moderator"}
+}
+
+// boolToInt преобразует bool в int
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }

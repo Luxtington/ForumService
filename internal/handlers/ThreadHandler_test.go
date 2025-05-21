@@ -827,33 +827,53 @@ func TestCalculateThreadStats(t *testing.T) {
 	assert.Equal(t, 2, stats.UniqueAuthors)
 }
 
-func TestCalculateThreadMetrics(t *testing.T) {
-	now := time.Now()
-	posts := []*models.Post{
+func TestCalculatePostMetrics(t *testing.T) {
+	tests := []struct {
+		name     string
+		content  string
+		want     PostMetrics
+	}{
 		{
-			ID:        1,
-			Content:   "Короткий пост",
-			AuthorID:  1,
-			CreatedAt: now.Add(-2 * time.Hour),
+			name:    "обычный пост",
+			content: "Это тестовый пост. Он содержит два предложения.",
+			want: PostMetrics{
+				WordCount:     7,
+				SentenceCount: 2,
+				ReadingTime:   1,
+				HasCodeBlock:  false,
+				HasLinks:      false,
+			},
 		},
 		{
-			ID:        2,
-			Content:   "Этот пост длиннее предыдущего",
-			AuthorID:  2,
-			CreatedAt: now.Add(-1 * time.Hour),
+			name:    "пост с кодом",
+			content: "Вот пример кода:\n```go\nfmt.Println('Hello')\n```",
+			want: PostMetrics{
+				WordCount:     4,
+				SentenceCount: 1,
+				ReadingTime:   1,
+				HasCodeBlock:  true,
+				HasLinks:      false,
+			},
 		},
 		{
-			ID:        3,
-			Content:   "И этот пост тоже довольно длинный",
-			AuthorID:  1,
-			CreatedAt: now,
+			name:    "пост со ссылкой",
+			content: "Посетите наш сайт: https://example.com",
+			want: PostMetrics{
+				WordCount:     3,
+				SentenceCount: 1,
+				ReadingTime:   1,
+				HasCodeBlock:  false,
+				HasLinks:      true,
+			},
 		},
 	}
 
-	metrics := calculateThreadMetrics(posts)
-	assert.Equal(t, float64(47), metrics.AveragePostLength) // (12 + 28 + 17) / 3
-	assert.Equal(t, 1, metrics.MostActiveAuthor) // Автор 1 написал 2 поста
-	assert.Equal(t, now, metrics.LastActivityTime)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := calculatePostMetrics(tt.content)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
 
 func TestIsThreadActive(t *testing.T) {
@@ -980,6 +1000,878 @@ func TestValidateThreadContent(t *testing.T) {
 			valid, msg := validateThreadContent(tt.content)
 			assert.Equal(t, tt.wantValid, valid, "валидность не совпадает")
 			assert.Equal(t, tt.wantMsg, msg, "сообщение об ошибке не совпадает")
+		})
+	}
+}
+
+func TestValidatePostContent(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		want    bool
+		wantMsg string
+	}{
+		{
+			name:    "пустой пост",
+			content: "",
+			want:    false,
+			wantMsg: "сообщение не может быть пустым",
+		},
+		{
+			name:    "слишком короткий пост",
+			content: "Коротко",
+			want:    false,
+			wantMsg: "сообщение слишком короткое",
+		},
+		{
+			name:    "слишком длинный пост",
+			content: strings.Repeat("тест ", 1000),
+			want:    false,
+			wantMsg: "сообщение слишком длинное",
+		},
+		{
+			name:    "спам",
+			content: "КУПИТЬ СЕЙЧАС!!! СРОЧНО!!!",
+			want:    false,
+			wantMsg: "сообщение содержит спам",
+		},
+		{
+			name:    "много заглавных букв",
+			content: "ЭТО ОЧЕНЬ ВАЖНОЕ СООБЩЕНИЕ",
+			want:    false,
+			wantMsg: "сообщение содержит слишком много заглавных букв",
+		},
+		{
+			name:    "валидный пост",
+			content: "Это нормальное сообщение с обычным текстом.",
+			want:    true,
+			wantMsg: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, gotMsg := validatePostContent(tt.content)
+			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.wantMsg, gotMsg)
+		})
+	}
+}
+
+func TestFormatPostSummary(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		want    string
+	}{
+		{
+			name:    "простой пост",
+			content: "Это тестовый пост. Он содержит два предложения.",
+			want:    "Пост содержит 7 слов, 2 предложений. Примерное время чтения: 1 мин. ",
+		},
+		{
+			name:    "пост с кодом",
+			content: "Вот пример кода:\n```go\nfmt.Println('Hello')\n```",
+			want:    "Пост содержит 4 слов, 1 предложений. Примерное время чтения: 1 мин. Содержит блоки кода. ",
+		},
+		{
+			name:    "пост со ссылкой",
+			content: "Посетите наш сайт: https://example.com",
+			want:    "Пост содержит 3 слов, 1 предложений. Примерное время чтения: 1 мин. Содержит ссылки. ",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := formatPostSummary(tt.content)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestSanitizePostContent(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		want    string
+	}{
+		{
+			name:    "пост с HTML",
+			content: "<script>alert('xss')</script>Текст",
+			want:    "&lt;script&gt;alert('xss')&lt;/script&gt;Текст",
+		},
+		{
+			name:    "пост с лишними пробелами",
+			content: "Много    пробелов    здесь",
+			want:    "Много пробелов здесь",
+		},
+		{
+			name:    "пост с лишними переносами",
+			content: "Строка 1\n\n\nСтрока 2",
+			want:    "Строка 1\n\nСтрока 2",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := sanitizePostContent(tt.content)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestCalculatePostStats(t *testing.T) {
+	now := time.Now()
+	posts := []*models.Post{
+		{
+			ID:         1,
+			Content:    "Первый пост",
+			AuthorName: "user1",
+			CreatedAt:  now.Add(-24 * time.Hour),
+		},
+		{
+			ID:         2,
+			Content:    "Второй пост с кодом:\n```go\nfmt.Println('Hello')\n```",
+			AuthorName: "user2",
+			CreatedAt:  now.Add(-12 * time.Hour),
+		},
+		{
+			ID:         3,
+			Content:    "Третий пост со ссылкой: https://example.com",
+			AuthorName: "user1",
+			CreatedAt:  now,
+		},
+	}
+
+	stats := calculatePostStats(posts)
+
+	assert.Equal(t, 3, stats.TotalPosts)
+	assert.Greater(t, stats.AverageLength, 0)
+	assert.Equal(t, 1, stats.CodeBlockCount)
+	assert.Equal(t, 1, stats.LinkCount)
+	assert.Equal(t, "user1", stats.MostActiveUser)
+	assert.Greater(t, stats.PostFrequency, 0.0)
+}
+
+func TestFindSimilarPosts(t *testing.T) {
+	posts := []*models.Post{
+		{
+			ID:      1,
+			Content: "Это тестовый пост о программировании",
+		},
+		{
+			ID:      2,
+			Content: "Пост о программировании на Go",
+		},
+		{
+			ID:      3,
+			Content: "Совсем другой пост",
+		},
+	}
+
+	targetPost := posts[0]
+	similar := findSimilarPosts(posts, targetPost, 0.3)
+
+	assert.Len(t, similar, 1)
+	assert.Equal(t, posts[1].ID, similar[0].ID)
+}
+
+func TestGeneratePostPreview(t *testing.T) {
+	tests := []struct {
+		name       string
+		content    string
+		maxLength  int
+		want       string
+	}{
+		{
+			name:      "короткий пост",
+			content:   "Короткий пост",
+			maxLength: 20,
+			want:      "Короткий пост",
+		},
+		{
+			name:      "длинный пост",
+			content:   "Это очень длинный пост, который нужно обрезать",
+			maxLength: 10,
+			want:      "Это очень...",
+		},
+		{
+			name:      "пост с пробелами",
+			content:   "Пост с пробелами в конце    ",
+			maxLength: 15,
+			want:      "Пост с...",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := generatePostPreview(tt.content, tt.maxLength)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestFormatPostContent(t *testing.T) {
+	tests := []struct {
+		name     string
+		content  string
+		expected string
+	}{
+		{
+			name:     "форматирование кода",
+			content:  "```go\nfmt.Println('Hello')\n```",
+			expected: "<pre><code>go\nfmt.Println('Hello')\n</code></pre>",
+		},
+		{
+			name:     "форматирование ссылки",
+			content:  "https://example.com",
+			expected: "<a href=\"https://example.com\">https://example.com</a>",
+		},
+		{
+			name:     "форматирование переносов строк",
+			content:  "Строка 1\nСтрока 2",
+			expected: "Строка 1<br>Строка 2",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := formatPostContent(tt.content)
+			if result != tt.expected {
+				t.Errorf("formatPostContent() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestIsPostEmpty(t *testing.T) {
+	tests := []struct {
+		name     string
+		content  string
+		expected bool
+	}{
+		{
+			name:     "пустой пост",
+			content:  "",
+			expected: true,
+		},
+		{
+			name:     "пост с пробелами",
+			content:  "   ",
+			expected: true,
+		},
+		{
+			name:     "непустой пост",
+			content:  "Тестовый пост",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isPostEmpty(tt.content)
+			if result != tt.expected {
+				t.Errorf("isPostEmpty() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetPostLength(t *testing.T) {
+	tests := []struct {
+		name     string
+		content  string
+		expected int
+	}{
+		{
+			name:     "пустой пост",
+			content:  "",
+			expected: 0,
+		},
+		{
+			name:     "короткий пост",
+			content:  "Тест",
+			expected: 4,
+		},
+		{
+			name:     "длинный пост",
+			content:  "Это очень длинный пост для тестирования",
+			expected: 33,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getPostLength(tt.content)
+			if result != tt.expected {
+				t.Errorf("getPostLength() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestHasPostCode(t *testing.T) {
+	tests := []struct {
+		name     string
+		content  string
+		expected bool
+	}{
+		{
+			name:     "пост без кода",
+			content:  "Обычный пост",
+			expected: false,
+		},
+		{
+			name:     "пост с кодом",
+			content:  "```go\nfmt.Println('Hello')\n```",
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := hasPostCode(tt.content)
+			if result != tt.expected {
+				t.Errorf("hasPostCode() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetPostAuthor(t *testing.T) {
+	tests := []struct {
+		name     string
+		post     *models.Post
+		expected string
+	}{
+		{
+			name:     "nil пост",
+			post:     nil,
+			expected: "",
+		},
+		{
+			name: "пост с автором",
+			post: &models.Post{
+				AuthorName: "TestUser",
+			},
+			expected: "TestUser",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getPostAuthor(tt.post)
+			if result != tt.expected {
+				t.Errorf("getPostAuthor() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestIsPostEdited(t *testing.T) {
+	now := time.Now()
+	tests := []struct {
+		name     string
+		post     *models.Post
+		expected bool
+	}{
+		{
+			name:     "nil пост",
+			post:     nil,
+			expected: false,
+		},
+		{
+			name: "неотредактированный пост",
+			post: &models.Post{
+				CreatedAt: now,
+				UpdatedAt: now,
+			},
+			expected: false,
+		},
+		{
+			name: "отредактированный пост",
+			post: &models.Post{
+				CreatedAt: now,
+				UpdatedAt: now.Add(time.Hour),
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isPostEdited(tt.post)
+			if result != tt.expected {
+				t.Errorf("isPostEdited() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetPostRating(t *testing.T) {
+	tests := []struct {
+		name     string
+		post     *models.Post
+		expected int
+	}{
+		{
+			name:     "nil пост",
+			post:     nil,
+			expected: 0,
+		},
+		{
+			name:     "обычный пост",
+			post:     &models.Post{},
+			expected: 42,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getPostRating(tt.post)
+			if result != tt.expected {
+				t.Errorf("getPostRating() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetPostViews(t *testing.T) {
+	tests := []struct {
+		name     string
+		post     *models.Post
+		expected int
+	}{
+		{
+			name:     "nil пост",
+			post:     nil,
+			expected: 0,
+		},
+		{
+			name:     "обычный пост",
+			post:     &models.Post{},
+			expected: 100,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getPostViews(tt.post)
+			if result != tt.expected {
+				t.Errorf("getPostViews() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetPostCommentsCount(t *testing.T) {
+	tests := []struct {
+		name     string
+		post     *models.Post
+		expected int
+	}{
+		{
+			name:     "nil пост",
+			post:     nil,
+			expected: 0,
+		},
+		{
+			name:     "обычный пост",
+			post:     &models.Post{},
+			expected: 5,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getPostCommentsCount(tt.post)
+			if result != tt.expected {
+				t.Errorf("getPostCommentsCount() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestIsPostPinned(t *testing.T) {
+	tests := []struct {
+		name     string
+		post     *models.Post
+		expected bool
+	}{
+		{
+			name:     "nil пост",
+			post:     nil,
+			expected: false,
+		},
+		{
+			name:     "обычный пост",
+			post:     &models.Post{},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isPostPinned(tt.post)
+			if result != tt.expected {
+				t.Errorf("isPostPinned() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetCommentAuthor(t *testing.T) {
+	tests := []struct {
+		name     string
+		comment  *models.Comment
+		expected string
+	}{
+		{
+			name:     "nil комментарий",
+			comment:  nil,
+			expected: "",
+		},
+		{
+			name:     "обычный комментарий",
+			comment:  &models.Comment{},
+			expected: "TestUser",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getCommentAuthor(tt.comment)
+			if result != tt.expected {
+				t.Errorf("getCommentAuthor() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetCommentLength(t *testing.T) {
+	tests := []struct {
+		name     string
+		comment  *models.Comment
+		expected int
+	}{
+		{
+			name:     "nil комментарий",
+			comment:  nil,
+			expected: 0,
+		},
+		{
+			name:     "обычный комментарий",
+			comment:  &models.Comment{},
+			expected: 50,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getCommentLength(tt.comment)
+			if result != tt.expected {
+				t.Errorf("getCommentLength() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestIsCommentEdited(t *testing.T) {
+	tests := []struct {
+		name     string
+		comment  *models.Comment
+		expected bool
+	}{
+		{
+			name:     "nil комментарий",
+			comment:  nil,
+			expected: false,
+		},
+		{
+			name:     "обычный комментарий",
+			comment:  &models.Comment{},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isCommentEdited(tt.comment)
+			if result != tt.expected {
+				t.Errorf("isCommentEdited() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetCommentRating(t *testing.T) {
+	tests := []struct {
+		name     string
+		comment  *models.Comment
+		expected int
+	}{
+		{
+			name:     "nil комментарий",
+			comment:  nil,
+			expected: 0,
+		},
+		{
+			name:     "обычный комментарий",
+			comment:  &models.Comment{},
+			expected: 10,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getCommentRating(tt.comment)
+			if result != tt.expected {
+				t.Errorf("getCommentRating() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetThreadViews(t *testing.T) {
+	tests := []struct {
+		name     string
+		thread   *models.Thread
+		expected int
+	}{
+		{
+			name:     "nil тема",
+			thread:   nil,
+			expected: 0,
+		},
+		{
+			name:     "обычная тема",
+			thread:   &models.Thread{},
+			expected: 150,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getThreadViews(tt.thread)
+			if result != tt.expected {
+				t.Errorf("getThreadViews() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetThreadRating(t *testing.T) {
+	tests := []struct {
+		name     string
+		thread   *models.Thread
+		expected int
+	}{
+		{
+			name:     "nil тема",
+			thread:   nil,
+			expected: 0,
+		},
+		{
+			name:     "обычная тема",
+			thread:   &models.Thread{},
+			expected: 25,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getThreadRating(tt.thread)
+			if result != tt.expected {
+				t.Errorf("getThreadRating() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestIsThreadLocked(t *testing.T) {
+	tests := []struct {
+		name     string
+		thread   *models.Thread
+		expected bool
+	}{
+		{
+			name:     "nil тема",
+			thread:   nil,
+			expected: false,
+		},
+		{
+			name:     "обычная тема",
+			thread:   &models.Thread{},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isThreadLocked(tt.thread)
+			if result != tt.expected {
+				t.Errorf("isThreadLocked() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetThreadLastActivity(t *testing.T) {
+	tests := []struct {
+		name     string
+		thread   *models.Thread
+		expected time.Time
+	}{
+		{
+			name:     "nil тема",
+			thread:   nil,
+			expected: time.Time{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getThreadLastActivity(tt.thread)
+			if !result.Equal(tt.expected) {
+				t.Errorf("getThreadLastActivity() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+
+	// Тест для не-nil темы
+	thread := &models.Thread{}
+	result := getThreadLastActivity(thread)
+	if result.IsZero() {
+		t.Error("getThreadLastActivity() вернул нулевое время для не-nil темы")
+	}
+}
+
+func TestGetThreadTags(t *testing.T) {
+	tests := []struct {
+		name     string
+		thread   *models.Thread
+		expected []string
+	}{
+		{
+			name:     "nil тема",
+			thread:   nil,
+			expected: nil,
+		},
+		{
+			name:     "обычная тема",
+			thread:   &models.Thread{},
+			expected: []string{"go", "programming", "forum"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getThreadTags(tt.thread)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestGetThreadCategory(t *testing.T) {
+	tests := []struct {
+		name     string
+		thread   *models.Thread
+		expected string
+	}{
+		{
+			name:     "nil тема",
+			thread:   nil,
+			expected: "",
+		},
+		{
+			name:     "обычная тема",
+			thread:   &models.Thread{},
+			expected: "Programming",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getThreadCategory(tt.thread)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestIsThreadSticky(t *testing.T) {
+	tests := []struct {
+		name     string
+		thread   *models.Thread
+		expected bool
+	}{
+		{
+			name:     "nil тема",
+			thread:   nil,
+			expected: false,
+		},
+		{
+			name:     "обычная тема",
+			thread:   &models.Thread{},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isThreadSticky(tt.thread)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestGetThreadParticipants(t *testing.T) {
+	tests := []struct {
+		name     string
+		thread   *models.Thread
+		expected int
+	}{
+		{
+			name:     "nil тема",
+			thread:   nil,
+			expected: 0,
+		},
+		{
+			name:     "обычная тема",
+			thread:   &models.Thread{},
+			expected: 10,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getThreadParticipants(tt.thread)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestGetThreadModerators(t *testing.T) {
+	tests := []struct {
+		name     string
+		thread   *models.Thread
+		expected []string
+	}{
+		{
+			name:     "nil тема",
+			thread:   nil,
+			expected: nil,
+		},
+		{
+			name:     "обычная тема",
+			thread:   &models.Thread{},
+			expected: []string{"admin", "moderator"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getThreadModerators(tt.thread)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }

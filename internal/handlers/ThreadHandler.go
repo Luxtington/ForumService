@@ -38,6 +38,18 @@ type UpdateThreadRequest struct {
 // 	}
 // }
 
+// CreateThread godoc
+// @Summary Создать новый тред
+// @Description Создаёт новый тред (тему) форума. Доступно только авторизованным пользователям.
+// @Tags threads
+// @Accept json
+// @Produce json
+// @Param input body object true "Данные для создания треда"
+// @Success 201 {object} models.Thread
+// @Failure 400 {object} map[string]string "неверный формат данных"
+// @Failure 401 {object} map[string]string "пользователь не аутентифицирован"
+// @Failure 500 {object} map[string]string "ошибка сервера"
+// @Router /threads [post]
 func (h *ThreadHandler) CreateThread(c *gin.Context) {
 	var request struct {
 		Title string `json:"title" binding:"required"`
@@ -67,6 +79,16 @@ func (h *ThreadHandler) CreateThread(c *gin.Context) {
 	c.JSON(201, thread)
 }
 
+// GetThreadWithPosts godoc
+// @Summary Получить тред с постами
+// @Description Возвращает информацию о треде и все посты в нём.
+// @Tags threads
+// @Produce json
+// @Param id path int true "ID треда"
+// @Success 200 {object} map[string]interface{} "thread: информация о треде, posts: список постов"
+// @Failure 400 {object} map[string]string "invalid thread ID"
+// @Failure 404 {object} map[string]string "thread not found"
+// @Router /threads/{id} [get]
 func (h *ThreadHandler) GetThreadWithPosts(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -86,6 +108,18 @@ func (h *ThreadHandler) GetThreadWithPosts(c *gin.Context) {
 	})
 }
 
+// DeleteThread godoc
+// @Summary Удалить тред
+// @Description Удаляет тред. Доступно только автору треда или администратору.
+// @Tags threads
+// @Produce json
+// @Param id path int true "ID треда"
+// @Success 204 "No Content"
+// @Failure 400 {object} map[string]string "invalid thread ID"
+// @Failure 401 {object} map[string]string "unauthorized"
+// @Failure 403 {object} map[string]string "no permission to delete this thread"
+// @Failure 500 {object} map[string]string "ошибка сервера"
+// @Router /threads/{id} [delete]
 func (h *ThreadHandler) DeleteThread(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -126,6 +160,20 @@ func (h *ThreadHandler) DeleteThread(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// UpdateThread godoc
+// @Summary Обновить тред
+// @Description Обновляет информацию о треде. Доступно только автору треда или администратору.
+// @Tags threads
+// @Accept json
+// @Produce json
+// @Param id path int true "ID треда"
+// @Param input body object true "Данные для обновления треда"
+// @Success 200 {object} models.Thread
+// @Failure 400 {object} map[string]string "invalid thread ID или неверный формат данных"
+// @Failure 401 {object} map[string]string "unauthorized"
+// @Failure 403 {object} map[string]string "no permission to update this thread"
+// @Failure 500 {object} map[string]string "ошибка сервера"
+// @Router /threads/{id} [put]
 func (h *ThreadHandler) UpdateThread(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -173,6 +221,14 @@ func (h *ThreadHandler) UpdateThread(c *gin.Context) {
 	c.JSON(http.StatusOK, thread)
 }
 
+// GetAllThreads godoc
+// @Summary Получить все треды
+// @Description Возвращает список всех тредов форума.
+// @Tags threads
+// @Produce json
+// @Success 200 {array} models.Thread
+// @Failure 500 {object} map[string]string "ошибка сервера"
+// @Router /threads [get]
 func (h *ThreadHandler) GetAllThreads(c *gin.Context) {
 	threads, err := h.service.GetAllThreads()
 	if err != nil {
@@ -191,6 +247,16 @@ func (h *ThreadHandler) GetAllThreads(c *gin.Context) {
 	c.JSON(http.StatusOK, threads)
 }
 
+// GetThreadPosts godoc
+// @Summary Получить посты треда
+// @Description Возвращает список всех постов в указанном треде.
+// @Tags threads
+// @Produce json
+// @Param id path int true "ID треда"
+// @Success 200 {array} models.Post
+// @Failure 400 {object} map[string]string "invalid thread ID"
+// @Failure 404 {object} map[string]string "thread not found"
+// @Router /threads/{id}/posts [get]
 func (h *ThreadHandler) GetThreadPosts(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {

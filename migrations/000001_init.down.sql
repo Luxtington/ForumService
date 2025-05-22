@@ -1,6 +1,5 @@
--- Удаляем таблицы
+DROP TABLE IF EXISTS comments;
+DROP TABLE IF EXISTS posts;
 DROP TABLE IF EXISTS threads;
 DROP TABLE IF EXISTS users;
-
--- Удаляем тип
-DROP TYPE IF EXISTS user_role; 
+DROP TYPE IF EXISTS user_role;

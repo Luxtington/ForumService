@@ -16,6 +16,14 @@ func NewPostHandler(service service.PostService) *PostHandler {
 	return &PostHandler{service: service}
 }
 
+// GetAllPosts godoc
+// @Summary Получить все посты
+// @Description Возвращает список всех постов форума.
+// @Tags posts
+// @Produce json
+// @Success 200 {array} models.Post
+// @Failure 500 {object} map[string]string "ошибка сервера"
+// @Router /posts [get]
 func (h *PostHandler) GetAllPosts(c *gin.Context) {
 	// TODO: Реализовать получение всех постов
 	c.HTML(http.StatusOK, "posts.html", gin.H{
@@ -23,12 +31,32 @@ func (h *PostHandler) GetAllPosts(c *gin.Context) {
 	})
 }
 
+// ShowCreateForm godoc
+// @Summary Показать форму создания поста
+// @Description Отображает HTML-страницу с формой для создания нового поста.
+// @Tags posts
+// @Produce html
+// @Success 200 {string} string "HTML страница"
+// @Router /posts/create [get]
 func (h *PostHandler) ShowCreateForm(c *gin.Context) {
 	c.HTML(http.StatusOK, "create_post.html", gin.H{
 		"title": "Создать пост",
 	})
 }
 
+// CreatePost godoc
+// @Summary Создать новый пост
+// @Description Создаёт новый пост в указанном треде. Доступно только авторизованным пользователям.
+// @Tags posts
+// @Accept json
+// @Produce json
+// @Param input body object true "Данные для создания поста"
+// @Success 201 {object} models.Post
+// @Failure 400 {object} map[string]string "неверный формат данных"
+// @Failure 401 {object} map[string]string "пользователь не аутентифицирован"
+// @Failure 403 {object} map[string]string "нет прав для создания поста в этом треде"
+// @Failure 500 {object} map[string]string "ошибка сервера"
+// @Router /posts [post]
 func (h *PostHandler) CreatePost(c *gin.Context) {
 	var request struct {
 		ThreadID int    `json:"thread_id" binding:"required"`
@@ -84,6 +112,16 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 	c.JSON(201, post)
 }
 
+// GetPost godoc
+// @Summary Получить пост по ID
+// @Description Возвращает информацию о посте по его ID.
+// @Tags posts
+// @Produce json
+// @Param id path int true "ID поста"
+// @Success 200 {object} models.Post
+// @Failure 400 {object} map[string]string "invalid post ID"
+// @Failure 404 {object} map[string]string "post not found"
+// @Router /posts/{id} [get]
 func (h *PostHandler) GetPost(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -100,6 +138,16 @@ func (h *PostHandler) GetPost(c *gin.Context) {
 	c.JSON(http.StatusOK, post)
 }
 
+// GetPostWithComments godoc
+// @Summary Получить пост с комментариями
+// @Description Возвращает информацию о посте и все комментарии к нему.
+// @Tags posts
+// @Produce json
+// @Param id path int true "ID поста"
+// @Success 200 {object} map[string]interface{} "post: информация о посте, comments: список комментариев"
+// @Failure 400 {object} map[string]string "invalid post ID"
+// @Failure 404 {object} map[string]string "post not found"
+// @Router /posts/{id}/comments [get]
 func (h *PostHandler) GetPostWithComments(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -119,6 +167,16 @@ func (h *PostHandler) GetPostWithComments(c *gin.Context) {
 	})
 }
 
+// ShowEditForm godoc
+// @Summary Показать форму редактирования поста
+// @Description Отображает HTML-страницу с формой для редактирования поста.
+// @Tags posts
+// @Produce html
+// @Param id path int true "ID поста"
+// @Success 200 {string} string "HTML страница"
+// @Failure 400 {object} map[string]string "Неверный ID поста"
+// @Failure 404 {object} map[string]string "Пост не найден"
+// @Router /posts/{id}/edit [get]
 func (h *PostHandler) ShowEditForm(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -142,6 +200,20 @@ func (h *PostHandler) ShowEditForm(c *gin.Context) {
 	})
 }
 
+// UpdatePost godoc
+// @Summary Обновить пост
+// @Description Обновляет информацию о посте. Доступно только автору поста или администратору.
+// @Tags posts
+// @Accept json
+// @Produce json
+// @Param id path int true "ID поста"
+// @Param input body object true "Данные для обновления поста"
+// @Success 200 {object} models.Post
+// @Failure 400 {object} map[string]string "invalid post ID или неверный формат данных"
+// @Failure 401 {object} map[string]string "unauthorized"
+// @Failure 403 {object} map[string]string "no permission to update this post"
+// @Failure 500 {object} map[string]string "ошибка сервера"
+// @Router /posts/{id} [put]
 func (h *PostHandler) UpdatePost(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -176,9 +248,9 @@ func (h *PostHandler) UpdatePost(c *gin.Context) {
 	}
 
 	if existingPost.AuthorID != userIDInt && userRole != "admin" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "no permission to update this post"})
-			return
-		}
+		c.JSON(http.StatusForbidden, gin.H{"error": "no permission to update this post"})
+		return
+	}
 
 	if err := h.service.UpdatePost(&post, id, userIDInt); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -188,6 +260,18 @@ func (h *PostHandler) UpdatePost(c *gin.Context) {
 	c.JSON(http.StatusOK, post)
 }
 
+// DeletePost godoc
+// @Summary Удалить пост
+// @Description Удаляет пост. Доступно только автору поста или администратору.
+// @Tags posts
+// @Produce json
+// @Param id path int true "ID поста"
+// @Success 204 "No Content"
+// @Failure 400 {object} map[string]string "invalid post ID"
+// @Failure 401 {object} map[string]string "unauthorized"
+// @Failure 403 {object} map[string]string "no permission to delete this post"
+// @Failure 500 {object} map[string]string "ошибка сервера"
+// @Router /posts/{id} [delete]
 func (h *PostHandler) DeletePost(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -216,9 +300,9 @@ func (h *PostHandler) DeletePost(c *gin.Context) {
 	}
 
 	if post.AuthorID != userIDInt && userRole != "admin" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "no permission to delete this post"})
-			return
-		}
+		c.JSON(http.StatusForbidden, gin.H{"error": "no permission to delete this post"})
+		return
+	}
 
 	if err := h.service.DeletePost(id, userIDInt); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -228,6 +312,14 @@ func (h *PostHandler) DeletePost(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// ListPosts godoc
+// @Summary Список постов
+// @Description Отображает HTML-страницу со списком всех постов.
+// @Tags posts
+// @Produce html
+// @Success 200 {string} string "HTML страница"
+// @Failure 500 {object} map[string]string "ошибка сервера"
+// @Router /posts [get]
 func (h *PostHandler) ListPosts(c *gin.Context) {
 	posts, err := h.service.GetAllPosts()
 	if err != nil {
@@ -243,6 +335,16 @@ func (h *PostHandler) ListPosts(c *gin.Context) {
 	})
 }
 
+// ShowPost godoc
+// @Summary Показать пост
+// @Description Отображает HTML-страницу с информацией о посте.
+// @Tags posts
+// @Produce html
+// @Param id path int true "ID поста"
+// @Success 200 {string} string "HTML страница"
+// @Failure 400 {object} map[string]string "Неверный ID поста"
+// @Failure 404 {object} map[string]string "Пост не найден"
+// @Router /posts/{id} [get]
 func (h *PostHandler) ShowPost(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {

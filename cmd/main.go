@@ -21,7 +21,17 @@ import (
 	_"google.golang.org/grpc"
 	"go.uber.org/zap"
 	"context"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+	_ "ForumService/docs"
 )
+
+// @title Forum Service API
+// @version 1.0
+// @description API для форума
+// @host localhost:8081
+// @BasePath /api
+// @schemes http https
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -88,6 +98,9 @@ func main() {
 	r.LoadHTMLGlob("templates/*")
 	// Настройка статических файлов
 	r.Static("/static", "./static")
+
+	// Добавляем роут для Swagger
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Инициализация middleware для аутентификации
 	authMiddleware := middleware.AuthServiceMiddleware(authClient)

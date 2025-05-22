@@ -109,22 +109,33 @@ func main() {
 	hub := handlers.NewHub(chatRepo)
 	go hub.Run()
 
+	// Публичные маршруты
+	public := r.Group("/api")
+	{
+		// Публичные маршруты для тредов
+		public.GET("/threads", threadHandler.GetAllThreads)
+		public.GET("/threads/:id", threadHandler.GetThreadWithPosts)
+		public.GET("/threads/:id/posts", threadHandler.GetThreadPosts)
+		
+		// Публичные маршруты для постов
+		public.GET("/posts", postHandler.GetAllPosts)
+		public.GET("/posts/:id", postHandler.GetPost)
+		public.GET("/posts/:id/comments", postHandler.GetPostComments)
+
+		// Маршруты для сообщений
+		public.GET("/chat", chatHandler.GetMessages)
+	}
+
 	// Группа защищенных маршрутов
 	protected := r.Group("/api")
 	protected.Use(authMiddleware)
 
-	// Маршруты для тредов
-	protected.GET("/threads", threadHandler.GetAllThreads)
-	protected.GET("/threads/:id", threadHandler.GetThreadWithPosts)
-	protected.GET("/threads/:id/posts", threadHandler.GetThreadPosts)
+	// Защищенные маршруты для тредов
 	protected.POST("/threads", threadHandler.CreateThread)
 	protected.PUT("/threads/:id", threadHandler.UpdateThread)
 	protected.DELETE("/threads/:id", threadHandler.DeleteThread)
 
-	// Маршруты для постов
-	protected.GET("/posts", postHandler.GetAllPosts)
-	protected.GET("/posts/:id", postHandler.GetPost)
-	protected.GET("/posts/:id/comments", postHandler.GetPostComments)
+	// Защищенные маршруты для постов
 	protected.POST("/posts", postHandler.CreatePost)
 	protected.PUT("/posts/:id", postHandler.UpdatePost)
 	protected.DELETE("/posts/:id", postHandler.DeletePost)
@@ -135,7 +146,7 @@ func main() {
 
 	// Маршруты для чата
 	protected.POST("/chat", chatHandler.CreateMessage)
-	protected.GET("/chat", chatHandler.GetMessages)
+	//protected.GET("/chat", chatHandler.GetMessages)
 
 	// WebSocket маршрут (публичный)
 	r.GET("/ws", authMiddleware, func(c *gin.Context) {

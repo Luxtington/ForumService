@@ -1,17 +1,22 @@
 package handlers
 
 import (
-    "net/http"
-    "github.com/gin-gonic/gin"
-    "ForumService/internal/service"
+	"ForumService/internal/service"
+	"ForumService/internal/errors"
+	"github.com/gin-gonic/gin"
+	"net/http"
 )
 
 type ChatHandler struct {
-    service service.ChatService
+	service service.ChatService
 }
 
 func NewChatHandler(service service.ChatService) *ChatHandler {
-    return &ChatHandler{service: service}
+	return &ChatHandler{service: service}
+}
+
+type CreateMessageRequest struct {
+	Content string `json:"content" binding:"required"`
 }
 
 // CreateMessage godoc
@@ -27,32 +32,26 @@ func NewChatHandler(service service.ChatService) *ChatHandler {
 // @Failure 500 {object} map[string]string "ошибка сервера"
 // @Router /chat [post]
 func (h *ChatHandler) CreateMessage(c *gin.Context) {
-    var request struct {
-        Content string `json:"content" binding:"required"`
-    }
+	var request CreateMessageRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.Error(errors.NewValidationError("Неверный формат данных", err))
+		return
+	}
 
-    if err := c.ShouldBindJSON(&request); err != nil {
-        c.JSON(400, gin.H{"error": "неверный формат данных"})
-        return
-    }
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.Error(errors.NewUnauthorizedError("Пользователь не аутентифицирован", nil))
+		return
+	}
 
-    // Получаем ID пользователя из контекста
-    userID, exists := c.Get("user_id")
-    if !exists {
-        c.JSON(401, gin.H{"error": "пользователь не аутентифицирован"})
-        return
-    }
+	userIDInt := int(userID.(uint32))
+	message, err := h.service.CreateMessage(userIDInt, request.Content)
+	if err != nil {
+		c.Error(errors.NewInternalServerError("Ошибка при создании сообщения", err))
+		return
+	}
 
-    // Преобразуем uint в int
-    userIDInt := int(userID.(uint))
-
-    message, err := h.service.CreateMessage(userIDInt, request.Content)
-    if err != nil {
-        c.JSON(500, gin.H{"error": err.Error()})
-        return
-    }
-
-    c.JSON(201, message)
+	c.JSON(http.StatusCreated, message)
 }
 
 // GetMessages godoc
@@ -64,11 +63,11 @@ func (h *ChatHandler) CreateMessage(c *gin.Context) {
 // @Failure 500 {object} map[string]string "ошибка сервера"
 // @Router /chat [get]
 func (h *ChatHandler) GetMessages(c *gin.Context) {
-    messages, err := h.service.GetAllMessages()
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-        return
-    }
+	messages, err := h.service.GetAllMessages()
+	if err != nil {
+		c.Error(errors.NewInternalServerError("Ошибка при получении сообщений", err))
+		return
+	}
 
-    c.JSON(http.StatusOK, messages)
+	c.JSON(http.StatusOK, messages)
 } 

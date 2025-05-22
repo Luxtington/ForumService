@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"ForumService/internal/service"
+	"ForumService/internal/errors"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
@@ -14,8 +15,8 @@ type CommentHandler struct {
 }
 
 type CreateCommentRequest struct {
-	PostID  string `json:"post_id"`
-	Content string `json:"content"`
+	PostID  int    `json:"post_id" binding:"required"`
+	Content string `json:"content" binding:"required"`
 }
 
 func NewCommentHandler(service service.CommentService) *CommentHandler {
@@ -35,33 +36,26 @@ func NewCommentHandler(service service.CommentService) *CommentHandler {
 // @Failure 500 {object} map[string]string "ошибка сервера"
 // @Router /comments [post]
 func (h *CommentHandler) CreateComment(c *gin.Context) {
-	var request struct {
-		PostID  int    `json:"post_id" binding:"required"`
-		Content string `json:"content" binding:"required"`
-	}
-
+	var request CreateCommentRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(400, gin.H{"error": "неверный формат данных"})
+		c.Error(errors.NewValidationError("Неверный формат данных", err))
 		return
 	}
 
-	// Получаем ID пользователя из контекста
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(401, gin.H{"error": "пользователь не аутентифицирован"})
+		c.Error(errors.NewUnauthorizedError("Пользователь не аутентифицирован", nil))
 		return
 	}
 
-	// Преобразуем uint32 в int
 	userIDInt := int(userID.(uint32))
-
 	comment, err := h.service.CreateComment(request.PostID, userIDInt, request.Content)
 	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.Error(errors.NewInternalServerError("Ошибка при создании комментария", err))
 		return
 	}
 
-	c.JSON(201, comment)
+	c.JSON(http.StatusCreated, comment)
 }
 
 // DeleteComment godoc
@@ -79,44 +73,32 @@ func (h *CommentHandler) CreateComment(c *gin.Context) {
 func (h *CommentHandler) DeleteComment(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный ID комментария"})
+		c.Error(errors.NewBadRequestError("Неверный ID комментария", err))
 		return
 	}
 
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(401, gin.H{"error": "пользователь не аутентифицирован"})
+		c.Error(errors.NewUnauthorizedError("Пользователь не аутентифицирован", nil))
 		return
 	}
 
-	// Преобразуем uint32 в int
 	userIDInt := int(userID.(uint32))
-
-	// Получаем роль пользователя
 	userRole, _ := c.Get("user_role")
-	if userRole == nil {
-		userRole = "user"
-	}
 
-	// Отладочная информация
-	fmt.Printf("Debug - DeleteComment - User ID: %d, Role: %v\n", userIDInt, userRole)
-	fmt.Printf("Debug - DeleteComment - User Role type: %T\n", userRole)
-
-	// Проверяем, является ли пользователь автором комментария или администратором
 	comment, err := h.service.GetCommentByID(id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при получении комментария"})
+		c.Error(errors.NewNotFoundError("Комментарий не найден", err))
 		return
 	}
 
 	if comment.AuthorID != userIDInt && userRole != "admin" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "нет прав для удаления этого комментария"})
+		c.Error(errors.NewPermissionDeniedError("Нет прав для удаления комментария", nil))
 		return
 	}
 
-	err = h.service.DeleteComment(id, userIDInt)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if err := h.service.DeleteComment(id, userIDInt); err != nil {
+		c.Error(errors.NewInternalServerError("Ошибка при удалении комментария", err))
 		return
 	}
 

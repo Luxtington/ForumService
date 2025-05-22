@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"ForumService/internal/middleware"
 	"ForumService/internal/service"
 	"github.com/gin-gonic/gin"
 )
@@ -14,6 +15,9 @@ type Services struct {
 }
 
 func RegisterRoutes(router *gin.Engine, services *Services) {
+	// Добавляем middleware для обработки ошибок
+	router.Use(middleware.ErrorHandler())
+
 	// Инициализация обработчиков
 	viewsHandler := NewViewsHandler(services.ThreadService, services.PostService, services.CommentService, services.ChatService)
 	threadHandler := NewThreadHandler(services.ThreadService)

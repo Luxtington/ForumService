@@ -3,6 +3,7 @@ package handlers
 import (
 	"ForumService/internal/service"
 	"ForumService/internal/models"
+	"ForumService/internal/errors"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
@@ -51,32 +52,26 @@ type UpdateThreadRequest struct {
 // @Failure 500 {object} map[string]string "ошибка сервера"
 // @Router /threads [post]
 func (h *ThreadHandler) CreateThread(c *gin.Context) {
-	var request struct {
-		Title string `json:"title" binding:"required"`
-	}
-
+	var request CreateThreadRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(400, gin.H{"error": "неверный формат данных"})
+		c.Error(errors.NewValidationError("Неверный формат данных", err))
 		return
 	}
 
-	// Получаем ID пользователя из контекста
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(401, gin.H{"error": "пользователь не аутентифицирован"})
+		c.Error(errors.NewUnauthorizedError("Пользователь не аутентифицирован", nil))
 		return
 	}
 
-	// Преобразуем uint32 в int
 	userIDInt := int(userID.(uint32))
-
 	thread, err := h.service.CreateThread(request.Title, userIDInt)
 	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.Error(errors.NewInternalServerError("Ошибка при создании треда", err))
 		return
 	}
 
-	c.JSON(201, thread)
+	c.JSON(http.StatusCreated, thread)
 }
 
 // GetThreadWithPosts godoc
@@ -92,13 +87,13 @@ func (h *ThreadHandler) CreateThread(c *gin.Context) {
 func (h *ThreadHandler) GetThreadWithPosts(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid thread ID"})
+		c.Error(errors.NewBadRequestError("Неверный ID треда", err))
 		return
 	}
 
 	thread, posts, err := h.service.GetThreadWithPosts(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "thread not found"})
+		c.Error(errors.NewNotFoundError("Тред не найден", err))
 		return
 	}
 
@@ -123,37 +118,32 @@ func (h *ThreadHandler) GetThreadWithPosts(c *gin.Context) {
 func (h *ThreadHandler) DeleteThread(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid thread ID"})
+		c.Error(errors.NewBadRequestError("Неверный ID треда", err))
 		return
 	}
 
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		c.Error(errors.NewUnauthorizedError("Пользователь не аутентифицирован", nil))
 		return
 	}
+
 	userIDInt := int(userID.(uint32))
-
-	// Получаем роль пользователя
 	userRole, _ := c.Get("user_role")
-	if userRole == nil {
-		userRole = "user"
-	}
 
-	// Проверяем, является ли пользователь автором треда или администратором
 	thread, _, err := h.service.GetThreadWithPosts(id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при получении треда"})
+		c.Error(errors.NewNotFoundError("Тред не найден", err))
 		return
 	}
 
 	if thread.AuthorID != userIDInt && userRole != "admin" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "no permission to delete this thread"})
-			return
-		}
+		c.Error(errors.NewPermissionDeniedError("Нет прав для удаления треда", nil))
+		return
+	}
 
 	if err := h.service.DeleteThread(id, userIDInt); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.Error(errors.NewInternalServerError("Ошибка при удалении треда", err))
 		return
 	}
 
@@ -177,44 +167,39 @@ func (h *ThreadHandler) DeleteThread(c *gin.Context) {
 func (h *ThreadHandler) UpdateThread(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid thread ID"})
+		c.Error(errors.NewBadRequestError("Неверный ID треда", err))
+		return
+	}
+
+	var request UpdateThreadRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.Error(errors.NewValidationError("Неверный формат данных", err))
 		return
 	}
 
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		c.Error(errors.NewUnauthorizedError("Пользователь не аутентифицирован", nil))
 		return
 	}
+
 	userIDInt := int(userID.(uint32))
-
-	// Получаем роль пользователя
 	userRole, _ := c.Get("user_role")
-	if userRole == nil {
-		userRole = "user"
-	}
 
-	var req UpdateThreadRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Проверяем, является ли пользователь автором треда или администратором
 	thread, _, err := h.service.GetThreadWithPosts(id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при получении треда"})
+		c.Error(errors.NewNotFoundError("Тред не найден", err))
 		return
 	}
 
 	if thread.AuthorID != userIDInt && userRole != "admin" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "no permission to update this thread"})
-			return
-		}
+		c.Error(errors.NewPermissionDeniedError("Нет прав для редактирования треда", nil))
+		return
+	}
 
-	thread.Title = req.Title
+	thread.Title = request.Title
 	if err := h.service.UpdateThread(thread, userIDInt); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.Error(errors.NewInternalServerError("Ошибка при обновлении треда", err))
 		return
 	}
 
@@ -232,7 +217,7 @@ func (h *ThreadHandler) UpdateThread(c *gin.Context) {
 func (h *ThreadHandler) GetAllThreads(c *gin.Context) {
 	threads, err := h.service.GetAllThreads()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.Error(errors.NewInternalServerError("Ошибка при получении списка тредов", err))
 		return
 	}
 

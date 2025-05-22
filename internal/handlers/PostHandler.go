@@ -3,6 +3,7 @@ package handlers
 import (
 	"ForumService/internal/models"
 	"ForumService/internal/service"
+	"ForumService/internal/errors"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
@@ -16,6 +17,15 @@ func NewPostHandler(service service.PostService) *PostHandler {
 	return &PostHandler{service: service}
 }
 
+type CreatePostRequest struct {
+	ThreadID int    `json:"thread_id" binding:"required"`
+	Content  string `json:"content" binding:"required"`
+}
+
+type UpdatePostRequest struct {
+	Content string `json:"content" binding:"required"`
+}
+
 // GetAllPosts godoc
 // @Summary Получить все посты
 // @Description Возвращает список всех постов форума.
@@ -25,10 +35,13 @@ func NewPostHandler(service service.PostService) *PostHandler {
 // @Failure 500 {object} map[string]string "ошибка сервера"
 // @Router /posts [get]
 func (h *PostHandler) GetAllPosts(c *gin.Context) {
-	// TODO: Реализовать получение всех постов
-	c.HTML(http.StatusOK, "posts.html", gin.H{
-		"title": "Все посты",
-	})
+	posts, err := h.service.GetAllPosts()
+	if err != nil {
+		c.Error(errors.NewInternalServerError("Ошибка при получении списка постов", err))
+		return
+	}
+
+	c.JSON(http.StatusOK, posts)
 }
 
 // ShowCreateForm godoc
@@ -58,58 +71,31 @@ func (h *PostHandler) ShowCreateForm(c *gin.Context) {
 // @Failure 500 {object} map[string]string "ошибка сервера"
 // @Router /posts [post]
 func (h *PostHandler) CreatePost(c *gin.Context) {
-	var request struct {
-		ThreadID int    `json:"thread_id" binding:"required"`
-		Content  string `json:"content" binding:"required"`
-	}
-
+	var request CreatePostRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(400, gin.H{"error": "неверный формат данных"})
+		c.Error(errors.NewValidationError("Неверный формат данных", err))
 		return
 	}
 
-	// Получаем ID пользователя из контекста
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(401, gin.H{"error": "пользователь не аутентифицирован"})
+		c.Error(errors.NewUnauthorizedError("Пользователь не аутентифицирован", nil))
 		return
 	}
 
-	// Преобразуем uint32 в int
 	userIDInt := int(userID.(uint32))
-
-	// Получаем роль пользователя
-	userRole, _ := c.Get("user_role")
-	if userRole == nil {
-		userRole = "user"
-	}
-
-	// Проверяем, является ли пользователь автором треда или администратором
-	thread, err := h.service.GetThreadByID(request.ThreadID)
-	if err != nil {
-		c.JSON(500, gin.H{"error": "ошибка при получении информации о треде"})
-		return
-	}
-
-	if thread.AuthorID != userIDInt && userRole != "admin" {
-		c.JSON(403, gin.H{"error": "нет прав для создания поста в этом треде"})
-		return
-	}
-
-	// Создаем объект поста
 	post := &models.Post{
 		ThreadID: request.ThreadID,
 		AuthorID: userIDInt,
 		Content:  request.Content,
 	}
 
-	// Создаем пост
 	if err := h.service.CreatePost(post); err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.Error(errors.NewInternalServerError("Ошибка при создании поста", err))
 		return
 	}
 
-	c.JSON(201, post)
+	c.JSON(http.StatusCreated, post)
 }
 
 // GetPost godoc
@@ -125,13 +111,13 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 func (h *PostHandler) GetPost(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid post ID"})
+		c.Error(errors.NewBadRequestError("Неверный ID поста", err))
 		return
 	}
 
-	post, err := h.service.GetPostByID(id)
+	post, err := h.service.GetPost(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "post not found"})
+		c.Error(errors.NewNotFoundError("Пост не найден", err))
 		return
 	}
 
@@ -217,43 +203,39 @@ func (h *PostHandler) ShowEditForm(c *gin.Context) {
 func (h *PostHandler) UpdatePost(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid post ID"})
+		c.Error(errors.NewBadRequestError("Неверный ID поста", err))
+		return
+	}
+
+	var request UpdatePostRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.Error(errors.NewValidationError("Неверный формат данных", err))
 		return
 	}
 
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		c.Error(errors.NewUnauthorizedError("Пользователь не аутентифицирован", nil))
 		return
 	}
+
 	userIDInt := int(userID.(uint32))
-
-	// Получаем роль пользователя
 	userRole, _ := c.Get("user_role")
-	if userRole == nil {
-		userRole = "user"
-	}
 
-	var post models.Post
-	if err := c.ShouldBindJSON(&post); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Проверяем, является ли пользователь автором поста или администратором
-	existingPost, err := h.service.GetPostByID(id)
+	post, err := h.service.GetPost(id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при получении поста"})
+		c.Error(errors.NewNotFoundError("Пост не найден", err))
 		return
 	}
 
-	if existingPost.AuthorID != userIDInt && userRole != "admin" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "no permission to update this post"})
+	if post.AuthorID != userIDInt && userRole != "admin" {
+		c.Error(errors.NewPermissionDeniedError("Нет прав для редактирования поста", nil))
 		return
 	}
 
-	if err := h.service.UpdatePost(&post, id, userIDInt); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	post.Content = request.Content
+	if err := h.service.UpdatePost(post, id, userIDInt); err != nil {
+		c.Error(errors.NewInternalServerError("Ошибка при обновлении поста", err))
 		return
 	}
 
@@ -275,37 +257,32 @@ func (h *PostHandler) UpdatePost(c *gin.Context) {
 func (h *PostHandler) DeletePost(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid post ID"})
+		c.Error(errors.NewBadRequestError("Неверный ID поста", err))
 		return
 	}
 
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		c.Error(errors.NewUnauthorizedError("Пользователь не аутентифицирован", nil))
 		return
 	}
+
 	userIDInt := int(userID.(uint32))
-
-	// Получаем роль пользователя
 	userRole, _ := c.Get("user_role")
-	if userRole == nil {
-		userRole = "user"
-	}
 
-	// Проверяем, является ли пользователь автором поста или администратором
-	post, err := h.service.GetPostByID(id)
+	post, err := h.service.GetPost(id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "ошибка при получении поста"})
+		c.Error(errors.NewNotFoundError("Пост не найден", err))
 		return
 	}
 
 	if post.AuthorID != userIDInt && userRole != "admin" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "no permission to delete this post"})
+		c.Error(errors.NewPermissionDeniedError("Нет прав для удаления поста", nil))
 		return
 	}
 
 	if err := h.service.DeletePost(id, userIDInt); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.Error(errors.NewInternalServerError("Ошибка при удалении поста", err))
 		return
 	}
 
@@ -455,15 +432,18 @@ func (h *PostHandler) DeleteComment(c *gin.Context) {
 func (h *PostHandler) GetPostComments(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid post ID"})
+		c.Error(errors.NewBadRequestError("Неверный ID поста", err))
 		return
 	}
 
-	_, comments, err := h.service.GetPostWithComments(id)
+	post, comments, err := h.service.GetPostWithComments(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "post not found"})
+		c.Error(errors.NewNotFoundError("Пост не найден", err))
 		return
 	}
 
-	c.JSON(http.StatusOK, comments)
+	c.JSON(http.StatusOK, gin.H{
+		"post": post,
+		"comments": comments,
+	})
 }

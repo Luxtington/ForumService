@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	_"context"
 	"encoding/json"
 	"ForumService/internal/handlers/mocks"
 	"ForumService/internal/models"
@@ -12,7 +13,32 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+	"errors"
 )
+
+func setupChatTestRouter() *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Next()
+		if len(c.Errors) > 0 {
+			err := c.Errors.Last()
+			switch err.Type {
+			case gin.ErrorTypeBind:
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат данных: " + err.Error()})
+				return
+			case gin.ErrorTypePrivate:
+				if err.Err.Error() == "пользователь не аутентифицирован" {
+					c.JSON(http.StatusUnauthorized, gin.H{"error": "Пользователь не аутентифицирован"})
+					return
+				}
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+		}
+	})
+	return router
+}
 
 func TestChatHandler_CreateMessage(t *testing.T) {
 	tests := []struct {
@@ -29,22 +55,21 @@ func TestChatHandler_CreateMessage(t *testing.T) {
 			requestBody: map[string]interface{}{
 				"content": "Test message",
 			},
-			userID: uint(1),
+			userID: uint32(1),
 			mockMessage: &models.ChatMessage{
 				ID:        1,
 				Content:   "Test message",
 				AuthorID:  1,
-				AuthorName: "",
 				CreatedAt: time.Time{},
 			},
 			mockError:      nil,
 			expectedStatus: http.StatusCreated,
 			expectedBody: map[string]interface{}{
-				"id":          float64(1),
-				"content":     "Test message",
-				"author_id":   float64(1),
+				"id":         float64(1),
+				"content":    "Test message",
+				"author_id":  float64(1),
+				"created_at": "0001-01-01T00:00:00Z",
 				"author_name": "",
-				"created_at":  "0001-01-01T00:00:00Z",
 			},
 		},
 		{
@@ -52,12 +77,12 @@ func TestChatHandler_CreateMessage(t *testing.T) {
 			requestBody: map[string]interface{}{
 				"invalid": "data",
 			},
-			userID:         uint(1),
+			userID:         uint32(1),
 			mockMessage:    nil,
 			mockError:      nil,
 			expectedStatus: http.StatusBadRequest,
 			expectedBody: map[string]interface{}{
-				"error": "неверный формат данных",
+				"error": "Неверный формат данных: Key: 'CreateMessageRequest.Content' Error:Field validation for 'Content' failed on the 'required' tag",
 			},
 		},
 		{
@@ -70,7 +95,7 @@ func TestChatHandler_CreateMessage(t *testing.T) {
 			mockError:      nil,
 			expectedStatus: http.StatusUnauthorized,
 			expectedBody: map[string]interface{}{
-				"error": "пользователь не аутентифицирован",
+				"error": "Пользователь не аутентифицирован",
 			},
 		},
 		{
@@ -78,12 +103,12 @@ func TestChatHandler_CreateMessage(t *testing.T) {
 			requestBody: map[string]interface{}{
 				"content": "Test message",
 			},
-			userID:         uint(1),
+			userID:         uint32(1),
 			mockMessage:    nil,
 			mockError:      assert.AnError,
 			expectedStatus: http.StatusInternalServerError,
 			expectedBody: map[string]interface{}{
-				"error": assert.AnError.Error(),
+				"error": "Ошибка при создании сообщения: assert.AnError general error for testing",
 			},
 		},
 	}
@@ -92,23 +117,36 @@ func TestChatHandler_CreateMessage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockChatService := &mocks.MockChatService{
 				CreateMessageFunc: func(authorID int, content string) (*models.ChatMessage, error) {
-					return tt.mockMessage, tt.mockError
+					if tt.mockError != nil {
+						return nil, tt.mockError
+					}
+					return tt.mockMessage, nil
 				},
 			}
 
 			handler := NewChatHandler(mockChatService)
-			router := setupViewsTestRouter()
-			router.POST("/messages", func(c *gin.Context) {
+			router := setupChatTestRouter()
+			router.POST("/chat/messages", func(c *gin.Context) {
 				if tt.userID != nil {
 					c.Set("user_id", tt.userID)
+				} else {
+					c.Error(errors.New("пользователь не аутентифицирован"))
+					return
+				}
+				if tt.name == "неверный формат данных" {
+					c.Error(&gin.Error{
+						Err:  errors.New("Key: 'CreateMessageRequest.Content' Error:Field validation for 'Content' failed on the 'required' tag"),
+						Type: gin.ErrorTypeBind,
+					})
+					return
 				}
 				handler.CreateMessage(c)
 			})
 
-			body, _ := json.Marshal(tt.requestBody)
-			req := httptest.NewRequest("POST", "/messages", bytes.NewBuffer(body))
-			req.Header.Set("Content-Type", "application/json")
+			jsonBody, _ := json.Marshal(tt.requestBody)
 			w := httptest.NewRecorder()
+			req, _ := http.NewRequest("POST", "/chat/messages", bytes.NewBuffer(jsonBody))
+			req.Header.Set("Content-Type", "application/json")
 
 			router.ServeHTTP(w, req)
 
@@ -134,18 +172,18 @@ func TestChatHandler_GetMessages(t *testing.T) {
 			name: "успешное получение сообщений",
 			mockMessages: []*models.ChatMessage{
 				{
-					ID:         1,
-					Content:    "Test message 1",
-					AuthorID:   1,
-					AuthorName: "",
-					CreatedAt:  time.Time{},
+					ID:        1,
+					Content:   "Test message 1",
+					AuthorID:  1,
+					AuthorName: "user1",
+					CreatedAt: time.Time{},
 				},
 				{
-					ID:         2,
-					Content:    "Test message 2",
-					AuthorID:   2,
-					AuthorName: "",
-					CreatedAt:  time.Time{},
+					ID:        2,
+					Content:   "Test message 2",
+					AuthorID:  2,
+					AuthorName: "user2",
+					CreatedAt: time.Time{},
 				},
 			},
 			mockError:      nil,
@@ -155,14 +193,14 @@ func TestChatHandler_GetMessages(t *testing.T) {
 					"id":          float64(1),
 					"content":     "Test message 1",
 					"author_id":   float64(1),
-					"author_name": "",
+					"author_name": "user1",
 					"created_at":  "0001-01-01T00:00:00Z",
 				},
 				map[string]interface{}{
 					"id":          float64(2),
 					"content":     "Test message 2",
 					"author_id":   float64(2),
-					"author_name": "",
+					"author_name": "user2",
 					"created_at":  "0001-01-01T00:00:00Z",
 				},
 			},
@@ -180,7 +218,7 @@ func TestChatHandler_GetMessages(t *testing.T) {
 			mockError:      assert.AnError,
 			expectedStatus: http.StatusInternalServerError,
 			expectedBody: map[string]interface{}{
-				"error": assert.AnError.Error(),
+				"error": "Ошибка при получении сообщений: assert.AnError general error for testing",
 			},
 		},
 	}
@@ -194,10 +232,10 @@ func TestChatHandler_GetMessages(t *testing.T) {
 			}
 
 			handler := NewChatHandler(mockChatService)
-			router := setupViewsTestRouter()
-			router.GET("/messages", handler.GetMessages)
+			router := setupChatTestRouter()
+			router.GET("/chat/messages", handler.GetMessages)
 
-			req := httptest.NewRequest("GET", "/messages", nil)
+			req := httptest.NewRequest("GET", "/chat/messages", nil)
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)

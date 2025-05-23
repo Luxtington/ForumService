@@ -13,6 +13,7 @@ var (
 	ErrInternalServerError = errors.New("internal server error")
 	ErrEmptyContent        = errors.New("content cannot be empty")
 	ErrNoPermission        = errors.New("no permission to modify this post")
+	ErrUserNotFound        = errors.New("user not found")
 )
 
 //
